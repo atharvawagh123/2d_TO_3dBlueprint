@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Projects Collection
+    match /projects/{projectId} {
+      // Anyone can read a project (allows /view/:projectId public client sharing)
+      allow read: if true;
+      
+      // Only authenticated engineers can create or modify projects
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.created_by == request.auth.uid
+      );
+
+      // Blueprint Versions Subcollection
+      match /versions/{versionId} {
+        // Publicly readable for client 3D presentation
+        allow read: if true;
+        
+        // Only the project owner can publish or edit blueprint versions
+        allow create, update: if isAuthenticated() && (
+          get(/databases/$(database)/documents/projects/$(projectId)).data.created_by == request.auth.uid
+        );
+        allow delete: if false; // Blueprint versions are immutable history
+      }
+
+      // Comments Subcollection (Spatial 3D Feedback)
+      match /comments/{commentId} {
+        // Publicly readable for project reviewers
+        allow read: if true;
+        
+        // Both authenticated engineers AND unauthenticated clients can post comments
+        allow create: if request.resource.data.keys().hasAll(['position', 'text', 'created_at'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 2000;
+          
+        // Comments can only be updated/resolved by authenticated project owners or original author
+        allow update, delete: if isAuthenticated() && (
+          resource.data.created_by == request.auth.uid ||
+          get(/databases/$(database)/documents/projects/$(projectId)).data.created_by == request.auth.uid
+        );
+      }
+    }
+  }
+}
