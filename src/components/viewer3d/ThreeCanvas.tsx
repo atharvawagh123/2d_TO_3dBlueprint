@@ -4,11 +4,12 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { BlueprintElement, Comment, Vector3D } from '../../types';
 import { blueprintTo3D, type ConvertedScene3D } from '../../engine/blueprintTo3D';
 import { exportToGLB, captureCanvasScreenshot } from '../../services/exportService';
-import { 
-  Camera, 
-  Download, 
-  Layers, 
-  MessageSquarePlus, 
+import { getBoundingBoxDimensions, type BoundingBoxGPS } from '../../engine/gisProjection';
+import {
+  Camera,
+  Download,
+  Layers,
+  MessageSquarePlus,
   Focus,
   Maximize2,
   ChevronRight,
@@ -24,6 +25,8 @@ interface ThreeCanvasProps {
   onAddComment: (pos: Vector3D, text: string, author: string) => void;
   onSwitchTo2D?: () => void;
   readOnly?: boolean;
+  bbox?: BoundingBoxGPS;
+  satelliteUrl?: string;
 }
 
 export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
@@ -34,10 +37,12 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   onAddComment,
   onSwitchTo2D,
   readOnly = false,
+  bbox,
+  satelliteUrl,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  
+
   // Three.js instances refs
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -73,7 +78,9 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [isLayersDrawerOpen, setIsLayersDrawerOpen] = useState(true);
   const [showMiniHud, setShowMiniHud] = useState(true);
+  const [showSatelliteMap, setShowSatelliteMap] = useState(true);
   const miniCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const satelliteMeshRef = useRef<THREE.Mesh | null>(null);
 
   // Converted 3D scene data
   const [convertedData, setConvertedData] = useState<ConvertedScene3D | null>(null);
@@ -85,14 +92,14 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
 
-    // 1. Scene with daylight gradient sky
+    // 1. Scene with realistic daylight sky and horizon atmosphere
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xdbeafe);
-    scene.fog = new THREE.Fog(0xdbeafe, 450, 2600);
+    scene.background = new THREE.Color(0xe0f2fe);
+    scene.fog = new THREE.Fog(0xe0f2fe, 600, 3400);
     sceneRef.current = scene;
 
     // 2. Camera
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 4000);
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 4500);
     camera.position.set(120, 90, 140);
     cameraRef.current = camera;
 
@@ -106,9 +113,9 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.08;
     rendererRef.current = renderer;
 
     // 4. OrbitControls
@@ -117,47 +124,47 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     controls.dampingFactor = 0.07;
     controls.maxPolarAngle = Math.PI / 2 - 0.01;
     controls.minDistance = 3;
-    controls.maxDistance = 2500;
+    controls.maxDistance = 2800;
     controls.target.set(0, 5, 0);
     controlsRef.current = controls;
 
-    // 5. Daylight Lighting
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xcfd8dc, 0.85);
+    // 5. Realistic Daylight Lighting
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xdfe7ec, 0.9);
     scene.add(hemiLight);
 
-    const sunLight = new THREE.DirectionalLight(0xfffdf5, 1.8);
-    sunLight.position.set(220, 300, 160);
+    const sunLight = new THREE.DirectionalLight(0xfffaed, 1.9);
+    sunLight.position.set(240, 320, 180);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 10;
-    sunLight.shadow.camera.far = 1200;
-    const d = 350;
+    sunLight.shadow.camera.far = 1400;
+    const d = 400;
     sunLight.shadow.camera.left = -d;
     sunLight.shadow.camera.right = d;
     sunLight.shadow.camera.top = d;
     sunLight.shadow.camera.bottom = -d;
-    sunLight.shadow.bias = -0.0002;
+    sunLight.shadow.bias = -0.00015;
     scene.add(sunLight);
 
-    const skyFill = new THREE.DirectionalLight(0xe0f2fe, 0.6);
-    skyFill.position.set(-160, 100, -140);
+    const skyFill = new THREE.DirectionalLight(0xdbeafe, 0.65);
+    skyFill.position.set(-180, 120, -160);
     scene.add(skyFill);
 
-    // 6. Ground Terrain Plane (Light Architectural Engineering Pad)
-    const groundGeom = new THREE.PlaneGeometry(3000, 3000);
+    // 6. Ground Terrain Plane (Warm Architectural Engineering Base)
+    const groundGeom = new THREE.PlaneGeometry(12000, 12000);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc,
-      roughness: 0.95,
+      color: 0xf1f5f9,
+      roughness: 0.98,
       metalness: 0.02,
     });
     const ground = new THREE.Mesh(groundGeom, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
-    ground.position.y = -0.1;
+    ground.position.y = -0.05;
     scene.add(ground);
 
-    const grid = new THREE.GridHelper(1800, 90, 0x0284c7, 0xcbd5e1);
+    const grid = new THREE.GridHelper(6000, 120, 0x94a3b8, 0xe2e8f0);
     grid.position.y = 0;
     scene.add(grid);
 
@@ -202,21 +209,95 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     animate();
 
     const handleResize = () => {
-      if (!containerRef.current) return;
+      if (!containerRef.current || !cameraRef.current || !rendererRef.current) return;
       const w = containerRef.current.clientWidth;
       const h = containerRef.current.clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
+      if (w === 0 || h === 0) return;
+      cameraRef.current.aspect = w / h;
+      cameraRef.current.updateProjectionMatrix();
+      rendererRef.current.setSize(w, h);
     };
     window.addEventListener('resize', handleResize);
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      ro = new ResizeObserver(() => {
+        handleResize();
+      });
+      ro.observe(containerRef.current);
+    }
 
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', handleResize);
+      if (ro) ro.disconnect();
       renderer.dispose();
     };
   }, []);
+
+  // Satellite Aerial Base Imagery Projection directly beneath AOI
+  useEffect(() => {
+    if (!sceneRef.current) return;
+
+    if (satelliteMeshRef.current) {
+      sceneRef.current.remove(satelliteMeshRef.current);
+      satelliteMeshRef.current.geometry.dispose();
+      if (Array.isArray(satelliteMeshRef.current.material)) {
+        satelliteMeshRef.current.material.forEach((m) => m.dispose());
+      } else if (satelliteMeshRef.current.material) {
+        satelliteMeshRef.current.material.dispose();
+      }
+      satelliteMeshRef.current = null;
+    }
+
+    if (!satelliteUrl || !bbox || !showSatelliteMap) return;
+
+    const { widthMeters, heightMeters } = getBoundingBoxDimensions(bbox);
+
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      satelliteUrl,
+      (texture) => {
+        if (!sceneRef.current) return;
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.generateMipmaps = true;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+
+        const geom = new THREE.PlaneGeometry(widthMeters, heightMeters);
+        const mat = new THREE.MeshStandardMaterial({
+          map: texture,
+          roughness: 0.92,
+          metalness: 0.04,
+        });
+
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.rotation.x = -Math.PI / 2;
+        // Position slightly above the infinite terrain plane (-0.05) and below elements (0.00+)
+        mesh.position.set(0, -0.015, 0);
+        mesh.receiveShadow = true;
+        mesh.name = 'satellite_base_aoi_plane';
+
+        sceneRef.current.add(mesh);
+        satelliteMeshRef.current = mesh;
+      },
+      undefined,
+      (err) => {
+        console.warn('Failed to load satellite texture in 3D viewer', err);
+      }
+    );
+
+    return () => {
+      if (satelliteMeshRef.current && sceneRef.current) {
+        sceneRef.current.remove(satelliteMeshRef.current);
+        satelliteMeshRef.current.geometry.dispose();
+        if (satelliteMeshRef.current.material) {
+          (satelliteMeshRef.current.material as THREE.Material).dispose();
+        }
+        satelliteMeshRef.current = null;
+      }
+    };
+  }, [satelliteUrl, bbox, showSatelliteMap]);
 
   // Update 3D Geometry when elements change & Auto-frame initial scene!
   useEffect(() => {
@@ -248,15 +329,24 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       modelGroupRef.current?.add(elemGroup);
     });
 
-    // On initial load or scene overhaul (when no element is specifically selected), frame entire project!
+    // Auto-frame entire project whenever scene geometry updates
     if (!selectedElementId && controlsRef.current && cameraRef.current && converted.bounds) {
       const { center, size } = converted.bounds;
-      const maxDim = Math.max(size.x, size.z, 40);
-      controlsRef.current.target.copy(center);
+      const maxDim = Math.max(size.x, size.z, 60);
+
+      // Adjust dynamic fog to site bounds
+      if (sceneRef.current?.fog) {
+        const fog = sceneRef.current.fog as THREE.Fog;
+        fog.near = maxDim * 1.5;
+        fog.far = maxDim * 6.0;
+      }
+
+      const dist = Math.max(maxDim * 0.95, 45);
+      controlsRef.current.target.set(center.x, center.y + 4, center.z);
       cameraRef.current.position.set(
-        center.x + maxDim * 0.85,
-        center.y + maxDim * 0.65 + 10,
-        center.z + maxDim * 0.85
+        center.x + dist * 0.65,
+        center.y + dist * 0.45 + 10,
+        center.z + dist * 0.65
       );
       controlsRef.current.update();
     }
@@ -278,15 +368,16 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
     const center = targetElem.center;
     const size = targetElem.bounds.size;
-    const dim = Math.max(size.x, size.z, size.y, 8);
+    const dim = Math.max(size.x, size.z, size.y, 15);
     const radius = targetElem.bounds.radius || (dim / 2);
 
-    // Dynamic FOV-based camera distance so the entire element comfortably fills ~65% of viewport
+    // Use a comfortable framing distance — fills ~55% of viewport, never closer than 40m
     const fovRad = (cameraRef.current.fov * Math.PI) / 180;
-    const distance = Math.max((radius / Math.sin(fovRad / 2)) * 1.15, 30);
+    const distanceToFit = (radius / Math.sin(fovRad / 2)) * 1.6;
+    const distance = Math.max(distanceToFit, 40);
 
-    const elevation = distance * 0.55;
-    const horizontalDist = distance * 0.82;
+    const elevation = distance * 0.42;
+    const horizontalDist = distance * 0.78;
 
     const endTarget = new THREE.Vector3(center.x, center.y, center.z);
     const endPos = new THREE.Vector3(
@@ -423,22 +514,21 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const setCameraView = (view: 'iso' | 'top' | 'drone' | 'eye' | 'all') => {
     if (!cameraRef.current || !controlsRef.current || !convertedData?.bounds) return;
     const { center, size } = convertedData.bounds;
-    const maxDim = Math.max(size.x, size.z, 40);
-    const fovRad = (cameraRef.current.fov * Math.PI) / 180;
-    const dist = Math.max(((maxDim * 0.75) / Math.sin(fovRad / 2)), 50);
+    const maxDim = Math.max(size.x, size.z, 60);
+    const dist = Math.max(maxDim * 0.95, 45);
 
     const endTarget = center.clone();
     let endPos = cameraRef.current.position.clone();
 
     if (view === 'iso' || view === 'all') {
-      endPos = new THREE.Vector3(center.x + dist * 0.7, center.y + dist * 0.55, center.z + dist * 0.7);
+      endPos = new THREE.Vector3(center.x + dist * 0.65, center.y + dist * 0.48 + 8, center.z + dist * 0.65);
     } else if (view === 'top') {
-      endPos = new THREE.Vector3(center.x, center.y + dist * 1.35, center.z + 0.1);
+      endPos = new THREE.Vector3(center.x, center.y + dist * 1.15, center.z + 0.1);
     } else if (view === 'drone') {
-      endPos = new THREE.Vector3(center.x + dist * 0.35, center.y + dist * 0.9, center.z + dist * 0.35);
+      endPos = new THREE.Vector3(center.x + dist * 0.35, center.y + dist * 0.75, center.z + dist * 0.35);
     } else if (view === 'eye') {
-      endPos = new THREE.Vector3(center.x - maxDim * 0.35, center.y + 2.5, center.z - maxDim * 0.35);
-      endTarget.set(center.x, center.y + 3.5, center.z);
+      endPos = new THREE.Vector3(center.x - maxDim * 0.25, center.y + 3.5, center.z - maxDim * 0.25);
+      endTarget.set(center.x, center.y + 4.5, center.z);
     }
 
     cameraAnimRef.current = {
@@ -491,12 +581,21 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
         else ctx.lineTo(sx, sy);
       });
 
-      if (el.type === 'building' || el.type === 'boundary') {
+      if (el.type === 'building' || el.type === 'boundary' || el.type === 'ground') {
         ctx.closePath();
-        ctx.fillStyle = el.type === 'building' ? 'rgba(2, 132, 199, 0.35)' : 'rgba(16, 185, 129, 0.15)';
+        if (el.type === 'ground') {
+          const gType = el.metadata?.groundType;
+          ctx.fillStyle = gType === 'water'
+            ? 'rgba(2, 132, 199, 0.45)'
+            : (gType === 'parking' ? 'rgba(71, 85, 105, 0.45)' : (gType === 'plaza' ? 'rgba(148, 163, 184, 0.4)' : 'rgba(34, 197, 94, 0.4)'));
+          ctx.strokeStyle = gType === 'water' ? '#0284c7' : (gType === 'parking' ? '#475569' : '#16a34a');
+          ctx.lineWidth = 1;
+        } else {
+          ctx.fillStyle = el.type === 'building' ? 'rgba(2, 132, 199, 0.35)' : 'rgba(16, 185, 129, 0.15)';
+          ctx.strokeStyle = el.type === 'building' ? '#0284c7' : '#10b981';
+          ctx.lineWidth = 1.2;
+        }
         ctx.fill();
-        ctx.strokeStyle = el.type === 'building' ? '#0284c7' : '#10b981';
-        ctx.lineWidth = 1.2;
         ctx.stroke();
       } else {
         ctx.strokeStyle = el.type === 'bridge_deck' ? '#0284c7' : '#475569';
@@ -587,7 +686,7 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       {/* Sleek Floating Layers & Camera Angle Panel in 3D View (Directly solves user's request!) */}
       <div className="absolute top-3 left-3 z-20 flex flex-col gap-2">
         <div className="light-panel rounded-xl shadow-md border border-slate-200 overflow-hidden w-64">
-          <div 
+          <div
             onClick={() => setIsLayersDrawerOpen(!isLayersDrawerOpen)}
             className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between cursor-pointer hover:bg-slate-100 transition-colors"
           >
@@ -605,9 +704,8 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                   onSelectElement?.(null);
                   setCameraView('all');
                 }}
-                className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs transition-colors ${
-                  !selectedElementId ? 'bg-sky-50 text-sky-700 font-bold border border-sky-200' : 'text-slate-600 hover:bg-slate-100'
-                }`}
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs transition-colors ${!selectedElementId ? 'bg-sky-50 text-sky-700 font-bold border border-sky-200' : 'text-slate-600 hover:bg-slate-100'
+                  }`}
               >
                 <span className="flex items-center gap-1.5">
                   <Maximize2 className="w-3 h-3 text-sky-600" />
@@ -617,21 +715,22 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
 
               {elements.map((elem) => {
                 const isSelected = elem.id === selectedElementId;
-                const iconMap = {
+                const groundIcon = elem.metadata?.groundType === 'water' ? '💧' : (elem.metadata?.groundType === 'parking' ? '🅿️' : (elem.metadata?.groundType === 'plaza' ? '🏛️' : '🌳'));
+                const iconMap: Record<string, string> = {
                   road: '🛣️',
                   bridge_deck: '🌉',
                   building: '🏢',
                   boundary: '📍',
+                  ground: groundIcon,
                 };
                 return (
                   <button
                     key={elem.id}
                     onClick={() => onSelectElement?.(elem.id)}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs transition-all ${
-                      isSelected
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs transition-all ${isSelected
                         ? 'bg-sky-600 text-white font-bold shadow-xs'
                         : 'text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2 truncate pr-1">
                       <span className="text-sm shrink-0">{iconMap[elem.type] || '📐'}</span>
@@ -652,11 +751,10 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
               setCommentMode(!commentMode);
               setSelectedComment(null);
             }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-              commentMode
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${commentMode
                 ? 'bg-amber-500 text-white animate-pulse'
                 : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
-            }`}
+              }`}
           >
             <MessageSquarePlus className="w-3.5 h-3.5" />
             <span>{commentMode ? 'Click 3D Surface' : 'Add Pin'}</span>
@@ -692,6 +790,22 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           >
             <span>Walk</span>
           </button>
+
+          {satelliteUrl && (
+            <>
+              <div className="h-3.5 w-px bg-slate-200" />
+              <button
+                onClick={() => setShowSatelliteMap(!showSatelliteMap)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${showSatelliteMap
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                title="Toggle Real Satellite Aerial Orthophoto Base Map under AOI"
+              >
+                <span>{showSatelliteMap ? '🛰️ Satellite ON' : '🛰️ Satellite OFF'}</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 

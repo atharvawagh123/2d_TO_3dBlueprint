@@ -1,8 +1,23 @@
 import type { Project, BlueprintVersion, Comment } from '../types';
+import { getSatelliteTextureUrl } from '../engine/gisProjection';
 
 const STORAGE_PROJECTS_KEY = 'b23d_projects_v2';
 const STORAGE_VERSIONS_KEY = 'b23d_versions_v2';
 const STORAGE_COMMENTS_KEY = 'b23d_comments_v2';
+
+const NAGPUR_BBOX = {
+  west: 79.083,
+  south: 21.144,
+  east: 79.098,
+  north: 21.155,
+};
+
+const MUMBAI_BBOX = {
+  west: 72.818,
+  south: 18.922,
+  east: 72.833,
+  north: 18.935,
+};
 
 // Pre-seeded realistic demo data
 const DEFAULT_PROJECTS: Project[] = [
@@ -36,6 +51,8 @@ const DEFAULT_VERSIONS: BlueprintVersion[] = [
     created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
     created_by: 'lead_engineer_01',
     notes: 'Initial alignment layout with 25m pier spacing and highway approach.',
+    bbox: NAGPUR_BBOX,
+    satelliteUrl: getSatelliteTextureUrl(NAGPUR_BBOX),
     elements: [
       {
         id: 'elem_approach_road',
@@ -104,6 +121,8 @@ const DEFAULT_VERSIONS: BlueprintVersion[] = [
     created_at: new Date().toISOString(),
     created_by: 'lead_engineer_01',
     notes: 'Revision 2: Refined curvature and added East approach interchange.',
+    bbox: NAGPUR_BBOX,
+    satelliteUrl: getSatelliteTextureUrl(NAGPUR_BBOX),
     elements: [
       {
         id: 'elem_approach_road',
@@ -201,6 +220,8 @@ const DEFAULT_VERSIONS: BlueprintVersion[] = [
     created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
     created_by: 'lead_engineer_01',
     notes: 'Master layout with Commercial Towers A & B, connecting bridge, and boulevard.',
+    bbox: MUMBAI_BBOX,
+    satelliteUrl: getSatelliteTextureUrl(MUMBAI_BBOX),
     elements: [
       {
         id: 'elem_site_perimeter',
@@ -344,12 +365,27 @@ class Repository {
 
   public getVersions(projectId: string): BlueprintVersion[] {
     const versions = this.getStorage<BlueprintVersion>(STORAGE_VERSIONS_KEY, DEFAULT_VERSIONS);
-    return versions.filter(v => v.project_id === projectId).sort((a, b) => a.version_no - b.version_no);
+    return versions
+      .map(v => {
+        const def = DEFAULT_VERSIONS.find(d => d.id === v.id);
+        if (def && !v.satelliteUrl && def.satelliteUrl) {
+          return { ...v, bbox: def.bbox, satelliteUrl: def.satelliteUrl };
+        }
+        return v;
+      })
+      .filter(v => v.project_id === projectId)
+      .sort((a, b) => a.version_no - b.version_no);
   }
 
   public getVersion(versionId: string): BlueprintVersion | undefined {
     const versions = this.getStorage<BlueprintVersion>(STORAGE_VERSIONS_KEY, DEFAULT_VERSIONS);
-    return versions.find(v => v.id === versionId);
+    const v = versions.find(v => v.id === versionId);
+    if (!v) return undefined;
+    const def = DEFAULT_VERSIONS.find(d => d.id === v.id);
+    if (def && !v.satelliteUrl && def.satelliteUrl) {
+      return { ...v, bbox: def.bbox, satelliteUrl: def.satelliteUrl };
+    }
+    return v;
   }
 
   public saveVersion(version: BlueprintVersion): void {

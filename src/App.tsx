@@ -21,6 +21,7 @@ import { ProjectSelectorModal } from './components/layout/ProjectSelectorModal';
 import { VersionModal } from './components/layout/VersionModal';
 import { ShareModal } from './components/layout/ShareModal';
 import { SiteMapAOI } from './components/map/SiteMapAOI';
+import { getSatelliteTextureUrl, type BoundingBoxGPS } from './engine/gisProjection';
 
 export const App: React.FC = () => {
   // Load initial projects from repository
@@ -75,7 +76,7 @@ export const App: React.FC = () => {
   const [isInspectorOpen, setIsInspectorOpen] = useState(true);
 
   // Layout View Mode (GIS Map | 2D Canvas | 3D Digital Twin)
-  const [viewMode, setViewMode] = useState<AppViewMode>('editor2d');
+  const [viewMode, setViewMode] = useState<AppViewMode>('map');
 
   // Modals
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
@@ -144,12 +145,14 @@ export const App: React.FC = () => {
     pushHistory(updated);
   };
 
-  // Focus and Zoom in 3D
+  // Focus and Zoom in 3D - only highlights, doesn't force switch view mode
   const handleFocusElement3D = (id: string) => {
     setSelectedElementId(id);
     setIsInspectorOpen(true);
-    // Switch to 3D Digital Twin mode to inspect the element in 3D
-    setViewMode('viewer3d');
+    // Only switch to 3D if already in split or 3D view
+    if (viewMode === 'viewer3d' || viewMode === 'split') {
+      setViewMode('viewer3d');
+    }
   };
 
   // Undo / Redo
@@ -191,11 +194,12 @@ export const App: React.FC = () => {
   };
 
   // Import Live GIS AOI elements to project blueprint
-  const handleImportFromMap = (importedElements: BlueprintElement[], notes: string) => {
+  const handleImportFromMap = (importedElements: BlueprintElement[], notes: string, bbox?: BoundingBoxGPS) => {
     setElements(importedElements);
     pushHistory(importedElements);
 
     const newVersionNo = versions.length + 1;
+    const satelliteUrl = bbox ? getSatelliteTextureUrl(bbox) : undefined;
     const newVersion: BlueprintVersion = {
       id: `ver_${currentProjectId}_0${newVersionNo}_${Date.now().toString(36)}`,
       project_id: currentProjectId,
@@ -203,6 +207,8 @@ export const App: React.FC = () => {
       created_at: new Date().toISOString(),
       created_by: 'gis_surveyor',
       notes: notes || 'GIS Live AOI Infrastructure Import',
+      bbox,
+      satelliteUrl,
       elements: JSON.parse(JSON.stringify(importedElements)),
     };
 
@@ -223,7 +229,8 @@ export const App: React.FC = () => {
     projectName: string, 
     location: string, 
     importedElements: BlueprintElement[], 
-    notes: string
+    notes: string,
+    bbox?: BoundingBoxGPS
   ) => {
     const newProj: Project = {
       id: `proj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -236,6 +243,7 @@ export const App: React.FC = () => {
       updated_at: new Date().toISOString(),
     };
 
+    const satelliteUrl = bbox ? getSatelliteTextureUrl(bbox) : undefined;
     const initialVersion: BlueprintVersion = {
       id: `ver_${newProj.id}_01`,
       project_id: newProj.id,
@@ -243,6 +251,8 @@ export const App: React.FC = () => {
       created_at: new Date().toISOString(),
       created_by: 'gis_surveyor',
       notes: notes || 'Geospatial AOI Survey Blueprint',
+      bbox,
+      satelliteUrl,
       elements: JSON.parse(JSON.stringify(importedElements)),
     };
 
@@ -445,6 +455,8 @@ export const App: React.FC = () => {
                 elements={elements}
                 comments={comments}
                 selectedElementId={selectedElementId}
+                bbox={currentVersion?.bbox}
+                satelliteUrl={currentVersion?.satelliteUrl}
                 onSelectElement={(id) => {
                   setSelectedElementId(id);
                   if (id) setIsInspectorOpen(true);

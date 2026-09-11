@@ -179,11 +179,13 @@ export const ConstructionTakeoffSidebar: React.FC<ConstructionTakeoffSidebarProp
               dimensionLabel = `${Math.round(Math.abs(polygonArea(elem.points)))}m² plot`;
             }
 
-            const iconMap = {
+            const groundIcon = elem.metadata?.groundType === 'water' ? '💧' : (elem.metadata?.groundType === 'parking' ? '🅿️' : (elem.metadata?.groundType === 'plaza' ? '🏛️' : '🌳'));
+            const iconMap: Record<string, string> = {
               road: '🛣️',
               bridge_deck: '🌉',
               building: '🏢',
               boundary: '📍',
+              ground: groundIcon,
             };
 
             return (

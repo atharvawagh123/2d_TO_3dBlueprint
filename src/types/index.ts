@@ -11,12 +11,14 @@ export interface Project {
   description?: string;
 }
 
-export type ElementType = 'road' | 'bridge_deck' | 'boundary' | 'building';
+export type ElementType = 'road' | 'bridge_deck' | 'boundary' | 'building' | 'ground';
 
 export interface Point2D {
   x: number;
   y: number;
 }
+
+export type GroundType = 'park' | 'water' | 'parking' | 'plaza' | 'commercial_zone' | 'residential_zone' | 'grass';
 
 export interface ElementMetadata {
   lanes?: number;
@@ -32,7 +34,9 @@ export interface ElementMetadata {
   hwType?: string;
   railway?: string;
   buildingType?: string;
+  groundType?: GroundType;
   osmId?: number | string;
+  isLogisticsCrane?: boolean;
 }
 
 export interface BlueprintElement {
@@ -56,6 +60,13 @@ export interface BlueprintVersion {
   created_by: string;
   notes?: string;
   elements: BlueprintElement[];
+  bbox?: {
+    south: number;
+    west: number;
+    north: number;
+    east: number;
+  };
+  satelliteUrl?: string;
 }
 
 export interface Vector3D {

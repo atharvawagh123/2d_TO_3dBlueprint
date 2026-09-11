@@ -81,3 +81,15 @@ export function getBoundingBoxDimensions(bbox: BoundingBoxGPS): {
     center,
   };
 }
+
+/**
+ * Generates an aerial satellite orthophoto URL from Esri World Imagery REST service
+ * for a specific GPS bounding box.
+ */
+export function getSatelliteTextureUrl(
+  bbox: BoundingBoxGPS,
+  width = 1024,
+  height = 1024
+): string {
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bbox.west},${bbox.south},${bbox.east},${bbox.north}&bboxSR=4326&imageSR=4326&size=${width},${height}&format=jpg&f=image`;
+}

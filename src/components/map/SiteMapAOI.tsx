@@ -25,12 +25,13 @@ import {
 } from 'lucide-react';
 
 interface SiteMapAOIProps {
-  onImportToBlueprint: (elements: BlueprintElement[], notes: string) => void;
+  onImportToBlueprint: (elements: BlueprintElement[], notes: string, bbox?: BoundingBoxGPS) => void;
   onCreateProjectFromAOI: (
     projectName: string, 
     location: string, 
     elements: BlueprintElement[], 
-    notes: string
+    notes: string,
+    bbox?: BoundingBoxGPS
   ) => void;
 }
 
@@ -374,6 +375,33 @@ export const SiteMapAOI: React.FC<SiteMapAOIProps> = ({
             interactive: false,
           }).addTo(fg);
         }
+
+        // Ground Parcels (Parks, Water, Parking, Plazas)
+        if (elem.type === 'ground' && elem.points.length >= 3) {
+          const latLngs = elem.points.map((p) => {
+            const ll = projectMetersToLatLon(p, origin);
+            return [ll.lat, ll.lon] as [number, number];
+          });
+
+          const gType = elem.metadata?.groundType;
+          let color = '#16a34a';
+          let fillColor = '#4ade80';
+          if (gType === 'water') {
+            color = '#0284c7';
+            fillColor = '#38bdf8';
+          } else if (gType === 'parking' || gType === 'plaza') {
+            color = '#475569';
+            fillColor = '#94a3b8';
+          }
+
+          L.polygon(latLngs, {
+            color,
+            weight: 1.2,
+            fillColor,
+            fillOpacity: 0.28,
+            interactive: false,
+          }).addTo(fg);
+        }
       });
 
       // Tower Crane Overlay (55m radius)
@@ -656,10 +684,10 @@ export const SiteMapAOI: React.FC<SiteMapAOIProps> = ({
           { x: -22, y: -12 },
           { x: -28, y: -12 },
         ],
-        height: 65,
+        height: 60,
         elevation: 0,
         material_label: 'structural_steel',
-        metadata: { color: '#f59e0b' },
+        metadata: { color: '#f59e0b', isLogisticsCrane: true },
       });
     }
 
@@ -691,7 +719,7 @@ export const SiteMapAOI: React.FC<SiteMapAOIProps> = ({
     const location = `${activeBbox.south.toFixed(4)}, ${activeBbox.west.toFixed(4)}`;
     const notes = `Created from GIS AOI: ${activeLocationName} (${fetchResult?.stats.dimensions.widthM}m x ${fetchResult?.stats.dimensions.heightM}m). Live infrastructure extracted into 2D & 3D.`;
 
-    onCreateProjectFromAOI(projectName, location, elements, notes);
+    onCreateProjectFromAOI(projectName, location, elements, notes, activeBbox || undefined);
   };
 
   // Action: Import into active blueprint
@@ -700,7 +728,7 @@ export const SiteMapAOI: React.FC<SiteMapAOIProps> = ({
     if (elements.length === 0) return;
 
     const notes = `Imported from GIS AOI: ${activeLocationName} (${fetchResult?.stats.dimensions.widthM}m x ${fetchResult?.stats.dimensions.heightM}m)`;
-    onImportToBlueprint(elements, notes);
+    onImportToBlueprint(elements, notes, activeBbox || undefined);
   };
 
   return (
@@ -829,6 +857,18 @@ export const SiteMapAOI: React.FC<SiteMapAOIProps> = ({
                   </div>
                   <div className="text-[10px] text-slate-500 font-mono">
                     {fetchResult.stats.buildingTotalFootprintM2.toLocaleString()} m²
+                  </div>
+                </div>
+
+                <div className="p-2 rounded-xl bg-slate-50 border border-slate-200 col-span-2 flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] text-slate-500 font-medium">3D Ground Parcels (Parks, Water, Plazas)</div>
+                    <div className="text-xs font-bold font-mono text-emerald-800 mt-0.5">
+                      {fetchResult.stats.groundParcelCount} Parcels Extracted
+                    </div>
+                  </div>
+                  <div className="text-xs font-mono font-bold text-slate-700">
+                    {fetchResult.stats.groundTotalAreaM2.toLocaleString()} m²
                   </div>
                 </div>
               </div>

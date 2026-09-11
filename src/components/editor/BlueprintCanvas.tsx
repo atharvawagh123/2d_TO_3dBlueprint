@@ -43,6 +43,9 @@ export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
   const [cursorWorld, setCursorWorld] = useState<Point2D>({ x: 0, y: 0 });
   // Dragging existing vertex
   const [draggingVertex, setDraggingVertex] = useState<{ elementId: string; vertexIdx: number } | null>(null);
+  // Hovered element for clean floating tooltip
+  const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Convert Screen coordinates to World coordinates (Meters)
   const screenToWorld = useCallback((screenX: number, screenY: number): Point2D => {
@@ -342,11 +345,41 @@ export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
           ctx.strokeStyle = isSelected ? '#0284c7' : (elem.metadata?.color || '#0284c7');
           ctx.lineWidth = isSelected ? 3 : 2;
           ctx.stroke();
+        }
+      } else if (elem.type === 'ground') {
+        if (screenPts.length >= 3) {
+          ctx.beginPath();
+          ctx.moveTo(screenPts[0].x, screenPts[0].y);
+          for (let i = 1; i < screenPts.length; i++) {
+            ctx.lineTo(screenPts[i].x, screenPts[i].y);
+          }
+          ctx.closePath();
 
-          const centerPt = screenPts[0];
-          ctx.fillStyle = '#1e293b';
-          ctx.font = 'bold 11px Inter, sans-serif';
-          ctx.fillText(`🏢 ${elem.name || 'Building'} (${elem.height || 15}m)`, centerPt.x + 8, centerPt.y - 8);
+          const gType = elem.metadata?.groundType;
+          let fill = 'rgba(34, 197, 94, 0.2)';
+          let stroke = '#16a34a';
+          let icon = '🌳';
+
+          if (gType === 'water') {
+            fill = 'rgba(2, 132, 199, 0.25)';
+            stroke = '#0284c7';
+            icon = '💧';
+          } else if (gType === 'parking') {
+            fill = 'rgba(71, 85, 105, 0.22)';
+            stroke = '#475569';
+            icon = '🅿️';
+          } else if (gType === 'plaza') {
+            fill = 'rgba(148, 163, 184, 0.22)';
+            stroke = '#64748b';
+            icon = '🏛️';
+          }
+
+          ctx.fillStyle = fill;
+          ctx.fill();
+
+          ctx.strokeStyle = isSelected ? '#0284c7' : stroke;
+          ctx.lineWidth = isSelected ? 3 : 1.5;
+          ctx.stroke();
         }
       } else if (elem.type === 'boundary') {
         if (screenPts.length >= 3) {
@@ -530,6 +563,56 @@ export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
           points: newPts,
         });
       }
+    } else if (activeTool === 'select') {
+      // Hover detection for tooltip
+      const wPt = screenToWorld(e.clientX, e.clientY);
+      let foundId: string | null = null;
+
+      for (const elem of elements) {
+        // Check if near a vertex
+        for (const pt of elem.points) {
+          if (distance(pt, wPt) < 5 / scale) {
+            foundId = elem.id;
+            break;
+          }
+        }
+        if (!foundId && elem.points.length > 1) {
+          // Check if near any edge
+          for (let i = 0; i < elem.points.length - 1; i++) {
+            const p1 = elem.points[i];
+            const p2 = elem.points[i + 1];
+            const d = distance(p1, wPt) + distance(p2, wPt) - distance(p1, p2);
+            if (d < 2.5) {
+              foundId = elem.id;
+              break;
+            }
+          }
+        }
+        // For filled polygons (building, ground, boundary), check point-in-polygon
+        if (!foundId && (elem.type === 'building' || elem.type === 'ground' || elem.type === 'boundary') && elem.points.length >= 3) {
+          let inside = false;
+          const pts = elem.points;
+          for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+            if (
+              pts[i].y > wPt.y !== pts[j].y > wPt.y &&
+              wPt.x < ((pts[j].x - pts[i].x) * (wPt.y - pts[i].y)) / (pts[j].y - pts[i].y) + pts[i].x
+            ) {
+              inside = !inside;
+            }
+          }
+          if (inside) foundId = elem.id;
+        }
+        if (foundId) break;
+      }
+
+      if (foundId !== hoveredElementId) setHoveredElementId(foundId);
+      if (foundId) {
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const rect = canvas.getBoundingClientRect();
+          setTooltipPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        }
+      }
     }
   };
 
@@ -545,8 +628,11 @@ export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
     onScaleChange(newScale);
   };
 
-  return (
-    <div className="relative w-full h-full overflow-hidden bg-white cursor-crosshair select-none">
+    return (
+    <div
+      className="relative w-full h-full overflow-hidden bg-white select-none"
+      style={{ cursor: hoveredElementId ? 'pointer' : activeTool !== 'select' ? 'crosshair' : 'default' }}
+    >
       <canvas
         ref={canvasRef}
         onPointerDown={handlePointerDown}
@@ -554,6 +640,7 @@ export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
         onPointerUp={handlePointerUp}
         onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}
+        onPointerLeave={() => setHoveredElementId(null)}
         className="block w-full h-full"
       />
 
@@ -600,6 +687,50 @@ export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
           </button>
         </div>
       )}
+
+      {/* Clean Hover Tooltip for 2D Elements */}
+      {hoveredElementId && activeTool === 'select' && (() => {
+        const hElem = elements.find(e => e.id === hoveredElementId);
+        if (!hElem) return null;
+        const iconMap: Record<string, string> = {
+          road: '🛣️',
+          bridge_deck: '🌉',
+          building: '🏢',
+          boundary: '📍',
+          ground: hElem.metadata?.groundType === 'water' ? '💧' : hElem.metadata?.groundType === 'parking' ? '🅿️' : hElem.metadata?.groundType === 'plaza' ? '🏛️' : '🌳',
+        };
+        const typeLabel = hElem.type.replace('_', ' ');
+        const detail = hElem.type === 'building'
+          ? `Height: ${hElem.height || 15}m`
+          : hElem.type === 'road' || hElem.type === 'bridge_deck'
+          ? `Width: ${hElem.width || 12}m · ${hElem.metadata?.lanes || 2} lanes${hElem.elevation ? ` · +${hElem.elevation}m elev` : ''}`
+          : hElem.metadata?.groundType
+          ? `Ground: ${hElem.metadata.groundType}`
+          : `${hElem.points.length} vertices`;
+
+        return (
+          <div
+            className="pointer-events-none absolute z-50 animate-in fade-in duration-100"
+            style={{
+              left: Math.min(tooltipPos.x + 14, (canvasRef.current?.parentElement?.clientWidth || 900) - 230),
+              top: Math.max(tooltipPos.y - 56, 8),
+            }}
+          >
+            <div className="bg-slate-900/90 backdrop-blur-sm text-white rounded-xl shadow-xl border border-slate-700 px-3 py-2 text-xs min-w-[160px] max-w-[220px]">
+              <div className="flex items-center gap-1.5 font-bold text-[11px] mb-1">
+                <span className="text-sm">{iconMap[hElem.type] || '📐'}</span>
+                <span className="text-sky-300 capitalize">{typeLabel}</span>
+              </div>
+              <div className="font-semibold text-white truncate mb-0.5">{hElem.name}</div>
+              <div className="text-slate-400 text-[10px]">{detail}</div>
+              {hElem.material_label && (
+                <div className="text-slate-500 text-[10px] mt-0.5 truncate">Material: {hElem.material_label.replace(/_/g, ' ')}</div>
+              )}
+              <div className="text-slate-600 text-[9px] mt-1.5 border-t border-slate-700 pt-1">Click to select · Double-click to focus 3D</div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Bottom Coordinates & Scale Bar */}
       <div className="absolute bottom-3 left-3 z-10 light-panel px-3 py-1 rounded-lg flex items-center gap-3 text-xs font-mono text-slate-500 pointer-events-none shadow-xs">
