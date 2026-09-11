@@ -1,9 +1,9 @@
 import type { Project, BlueprintVersion, Comment } from '../types';
-import { getSatelliteTextureUrl } from '../engine/gisProjection';
+import { getSatelliteTextureUrl, getStreetMapTextureUrl } from '../engine/gisProjection';
 
-const STORAGE_PROJECTS_KEY = 'b23d_projects_v2';
-const STORAGE_VERSIONS_KEY = 'b23d_versions_v2';
-const STORAGE_COMMENTS_KEY = 'b23d_comments_v2';
+const STORAGE_PROJECTS_KEY = 'b23d_projects_v3';
+const STORAGE_VERSIONS_KEY = 'b23d_versions_v3';
+const STORAGE_COMMENTS_KEY = 'b23d_comments_v3';
 
 const NAGPUR_BBOX = {
   west: 79.083,
@@ -13,14 +13,24 @@ const NAGPUR_BBOX = {
 };
 
 const MUMBAI_BBOX = {
-  west: 72.818,
-  south: 18.922,
-  east: 72.833,
-  north: 18.935,
+  west: 72.8240,
+  south: 18.9310,
+  east: 72.8350,
+  north: 18.9400,
 };
 
 // Pre-seeded realistic demo data
 const DEFAULT_PROJECTS: Project[] = [
+  {
+    id: 'proj_metropolitan_plaza',
+    name: 'Mumbai Vidhan Bhavan & Marine Drive Coastal Corridor',
+    type: 'site',
+    location: 'Vidhan Bhavan Square, Nariman Point, Mumbai, India',
+    created_by: 'lead_engineer_01',
+    created_at: new Date(Date.now() - 86400000 * 7).toISOString(),
+    updated_at: new Date().toISOString(),
+    description: 'Arterial Vidhan Bhavan / Marine Drive corridor, commercial towers, and pedestrian link bridges.',
+  },
   {
     id: 'proj_bridge_interchange',
     name: 'Ram Jhula Viaduct & Kingsway Corridor',
@@ -30,16 +40,6 @@ const DEFAULT_PROJECTS: Project[] = [
     created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
     updated_at: new Date().toISOString(),
     description: 'Elevated cable-stayed viaduct, dual carriageway highway corridor, and metro transit approach.',
-  },
-  {
-    id: 'proj_metropolitan_plaza',
-    name: 'Mumbai Coastal Road & Commercial Plaza',
-    type: 'site',
-    location: 'Marine Drive, Mumbai, India',
-    created_by: 'lead_engineer_01',
-    created_at: new Date(Date.now() - 86400000 * 7).toISOString(),
-    updated_at: new Date().toISOString(),
-    description: 'Arterial coastal reclamation expressway, commercial towers, and pedestrian link bridges.',
   }
 ];
 
@@ -52,6 +52,7 @@ const DEFAULT_VERSIONS: BlueprintVersion[] = [
     created_by: 'lead_engineer_01',
     notes: 'Initial alignment layout with 25m pier spacing and highway approach.',
     bbox: NAGPUR_BBOX,
+    streetMapUrl: getStreetMapTextureUrl(NAGPUR_BBOX),
     satelliteUrl: getSatelliteTextureUrl(NAGPUR_BBOX),
     elements: [
       {
@@ -221,6 +222,7 @@ const DEFAULT_VERSIONS: BlueprintVersion[] = [
     created_by: 'lead_engineer_01',
     notes: 'Master layout with Commercial Towers A & B, connecting bridge, and boulevard.',
     bbox: MUMBAI_BBOX,
+    streetMapUrl: getStreetMapTextureUrl(MUMBAI_BBOX),
     satelliteUrl: getSatelliteTextureUrl(MUMBAI_BBOX),
     elements: [
       {
@@ -368,8 +370,8 @@ class Repository {
     return versions
       .map(v => {
         const def = DEFAULT_VERSIONS.find(d => d.id === v.id);
-        if (def && !v.satelliteUrl && def.satelliteUrl) {
-          return { ...v, bbox: def.bbox, satelliteUrl: def.satelliteUrl };
+        if (def && (!v.streetMapUrl || !v.bbox)) {
+          return { ...v, bbox: def.bbox, streetMapUrl: def.streetMapUrl, satelliteUrl: def.satelliteUrl };
         }
         return v;
       })
@@ -382,8 +384,8 @@ class Repository {
     const v = versions.find(v => v.id === versionId);
     if (!v) return undefined;
     const def = DEFAULT_VERSIONS.find(d => d.id === v.id);
-    if (def && !v.satelliteUrl && def.satelliteUrl) {
-      return { ...v, bbox: def.bbox, satelliteUrl: def.satelliteUrl };
+    if (def && (!v.streetMapUrl || !v.bbox)) {
+      return { ...v, bbox: def.bbox, streetMapUrl: def.streetMapUrl, satelliteUrl: def.satelliteUrl };
     }
     return v;
   }

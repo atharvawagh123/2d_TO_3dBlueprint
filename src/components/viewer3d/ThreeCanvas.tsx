@@ -4,7 +4,6 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { BlueprintElement, Comment, Vector3D } from '../../types';
 import { blueprintTo3D, type ConvertedScene3D } from '../../engine/blueprintTo3D';
 import { exportToGLB, captureCanvasScreenshot } from '../../services/exportService';
-import { getBoundingBoxDimensions, type BoundingBoxGPS } from '../../engine/gisProjection';
 import {
   Camera,
   Download,
@@ -14,6 +13,10 @@ import {
   Maximize2,
   ChevronRight,
   ChevronLeft,
+  Rotate3d,
+  Hand,
+  Plus,
+  Minus,
   Compass
 } from 'lucide-react';
 
@@ -25,8 +28,6 @@ interface ThreeCanvasProps {
   onAddComment: (pos: Vector3D, text: string, author: string) => void;
   onSwitchTo2D?: () => void;
   readOnly?: boolean;
-  bbox?: BoundingBoxGPS;
-  satelliteUrl?: string;
 }
 
 export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
@@ -37,8 +38,6 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   onAddComment,
   onSwitchTo2D,
   readOnly = false,
-  bbox,
-  satelliteUrl,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -78,9 +77,8 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [isLayersDrawerOpen, setIsLayersDrawerOpen] = useState(true);
   const [showMiniHud, setShowMiniHud] = useState(true);
-  const [showSatelliteMap, setShowSatelliteMap] = useState(true);
+  const [navMode, setNavMode] = useState<'orbit' | 'pan'>('orbit');
   const miniCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const satelliteMeshRef = useRef<THREE.Mesh | null>(null);
 
   // Converted 3D scene data
   const [convertedData, setConvertedData] = useState<ConvertedScene3D | null>(null);
@@ -118,13 +116,17 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     renderer.toneMappingExposure = 1.08;
     rendererRef.current = renderer;
 
-    // 4. OrbitControls
+    // 4. OrbitControls with full 3D dragging & panning capability
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.07;
+    controls.dampingFactor = 0.08;
     controls.maxPolarAngle = Math.PI / 2 - 0.01;
-    controls.minDistance = 3;
-    controls.maxDistance = 2800;
+    controls.minDistance = 0.5;
+    controls.maxDistance = 5000;
+    controls.enablePan = true;
+    controls.screenSpacePanning = true; // Crucial for natural dragging across buildings!
+    controls.panSpeed = 1.6;
+    controls.zoomSpeed = 1.8;
     controls.target.set(0, 5, 0);
     controlsRef.current = controls;
 
@@ -235,69 +237,15 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     };
   }, []);
 
-  // Satellite Aerial Base Imagery Projection directly beneath AOI
+  // Update mouse button mapping dynamically based on Orbit vs Pan mode
   useEffect(() => {
-    if (!sceneRef.current) return;
-
-    if (satelliteMeshRef.current) {
-      sceneRef.current.remove(satelliteMeshRef.current);
-      satelliteMeshRef.current.geometry.dispose();
-      if (Array.isArray(satelliteMeshRef.current.material)) {
-        satelliteMeshRef.current.material.forEach((m) => m.dispose());
-      } else if (satelliteMeshRef.current.material) {
-        satelliteMeshRef.current.material.dispose();
-      }
-      satelliteMeshRef.current = null;
-    }
-
-    if (!satelliteUrl || !bbox || !showSatelliteMap) return;
-
-    const { widthMeters, heightMeters } = getBoundingBoxDimensions(bbox);
-
-    const loader = new THREE.TextureLoader();
-    loader.load(
-      satelliteUrl,
-      (texture) => {
-        if (!sceneRef.current) return;
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.generateMipmaps = true;
-        texture.minFilter = THREE.LinearMipmapLinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-
-        const geom = new THREE.PlaneGeometry(widthMeters, heightMeters);
-        const mat = new THREE.MeshStandardMaterial({
-          map: texture,
-          roughness: 0.92,
-          metalness: 0.04,
-        });
-
-        const mesh = new THREE.Mesh(geom, mat);
-        mesh.rotation.x = -Math.PI / 2;
-        // Position slightly above the infinite terrain plane (-0.05) and below elements (0.00+)
-        mesh.position.set(0, -0.015, 0);
-        mesh.receiveShadow = true;
-        mesh.name = 'satellite_base_aoi_plane';
-
-        sceneRef.current.add(mesh);
-        satelliteMeshRef.current = mesh;
-      },
-      undefined,
-      (err) => {
-        console.warn('Failed to load satellite texture in 3D viewer', err);
-      }
-    );
-
-    return () => {
-      if (satelliteMeshRef.current && sceneRef.current) {
-        sceneRef.current.remove(satelliteMeshRef.current);
-        satelliteMeshRef.current.geometry.dispose();
-        if (satelliteMeshRef.current.material) {
-          (satelliteMeshRef.current.material as THREE.Material).dispose();
-        }
-        satelliteMeshRef.current = null;
-      }
+    if (!controlsRef.current) return;
+    controlsRef.current.mouseButtons = {
+      LEFT: navMode === 'pan' ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN,
     };
-  }, [satelliteUrl, bbox, showSatelliteMap]);
+  }, [navMode]);
 
   // Update 3D Geometry when elements change & Auto-frame initial scene!
   useEffect(() => {
@@ -673,6 +621,67 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
     setCommentText('');
   };
 
+  // Double-click on building or terrain to zoom & fly directly toward it!
+  const handleCanvasDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current || !cameraRef.current || !controlsRef.current || !sceneRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(x, y), cameraRef.current);
+
+    const candidates: THREE.Object3D[] = [];
+    if (modelGroupRef.current) candidates.push(...modelGroupRef.current.children);
+    sceneRef.current.children.forEach(c => {
+      if (c instanceof THREE.Mesh) candidates.push(c);
+    });
+
+    const hits = raycaster.intersectObjects(candidates, true);
+    if (hits.length > 0) {
+      const hitPt = hits[0].point;
+      const cam = cameraRef.current;
+      const ctrl = controlsRef.current;
+
+      const dir = cam.position.clone().sub(hitPt).normalize();
+      const curDist = cam.position.distanceTo(hitPt);
+      const targetDist = Math.max(curDist * 0.45, 12);
+      const endPos = hitPt.clone().add(dir.multiplyScalar(targetDist));
+
+      cameraAnimRef.current = {
+        active: true,
+        startPos: cam.position.clone(),
+        endPos,
+        startTarget: ctrl.target.clone(),
+        endTarget: hitPt.clone(),
+        progress: 0,
+      };
+    }
+  };
+
+  // Smooth Zoom In and Out
+  const handleZoomIn = () => {
+    if (!cameraRef.current || !controlsRef.current) return;
+    const cam = cameraRef.current;
+    const target = controlsRef.current.target;
+    const dist = cam.position.distanceTo(target);
+    const newDist = Math.max(dist * 0.65, 3);
+    const dir = cam.position.clone().sub(target).normalize();
+    cam.position.copy(target.clone().add(dir.multiplyScalar(newDist)));
+    controlsRef.current.update();
+  };
+
+  const handleZoomOut = () => {
+    if (!cameraRef.current || !controlsRef.current) return;
+    const cam = cameraRef.current;
+    const target = controlsRef.current.target;
+    const dist = cam.position.distanceTo(target);
+    const newDist = Math.min(dist * 1.45, 4000);
+    const dir = cam.position.clone().sub(target).normalize();
+    cam.position.copy(target.clone().add(dir.multiplyScalar(newDist)));
+    controlsRef.current.update();
+  };
+
   const focusedElement = convertedData?.elements.find(e => e.id === selectedElementId);
 
   return (
@@ -680,10 +689,11 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       <canvas
         ref={canvasRef}
         onClick={handleCanvasClick}
-        className={`w-full h-full block ${commentMode ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'}`}
+        onDoubleClick={handleCanvasDoubleClick}
+        className={`w-full h-full block ${commentMode ? 'cursor-crosshair' : (navMode === 'pan' ? 'cursor-move' : 'cursor-grab active:cursor-grabbing')}`}
       />
 
-      {/* Sleek Floating Layers & Camera Angle Panel in 3D View (Directly solves user's request!) */}
+      {/* Sleek Floating Layers & Camera Angle Panel in 3D View */}
       <div className="absolute top-3 left-3 z-20 flex flex-col gap-2">
         <div className="light-panel rounded-xl shadow-md border border-slate-200 overflow-hidden w-64">
           <div
@@ -719,9 +729,13 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                 const iconMap: Record<string, string> = {
                   road: '🛣️',
                   bridge_deck: '🌉',
-                  building: '🏢',
+                  building: elem.metadata?.isLogisticsCrane ? '🏗️' : '🏢',
                   boundary: '📍',
                   ground: groundIcon,
+                  stadium: '🏟️',
+                  crane: '🏗️',
+                  electric_pole: '⚡',
+                  water_pool: '💧',
                 };
                 return (
                   <button
@@ -744,7 +758,7 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           )}
         </div>
 
-        {/* Action Controls (Add Pin, Preset Views) */}
+        {/* Action Controls: Orbit/Pan Mode, Zoom In/Out, Add Pin */}
         <div className="light-panel p-1 rounded-xl flex items-center gap-1 shadow-sm w-fit">
           <button
             onClick={() => {
@@ -755,58 +769,44 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
               ? 'bg-amber-500 text-white animate-pulse'
               : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
               }`}
+            title="Place spatial comment pin on 3D building/surface"
           >
             <MessageSquarePlus className="w-3.5 h-3.5" />
-            <span>{commentMode ? 'Click 3D Surface' : 'Add Pin'}</span>
+            <span>{commentMode ? 'Click Surface' : 'Add Pin'}</span>
           </button>
 
           <div className="h-3.5 w-px bg-slate-200" />
 
+          {/* Orbit vs Drag/Pan Mode Toggle */}
           <button
-            onClick={() => setCameraView('iso')}
-            className="px-2 py-1 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1"
-            title="Isometric 45°"
+            onClick={() => setNavMode(navMode === 'orbit' ? 'pan' : 'orbit')}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${navMode === 'pan'
+              ? 'bg-sky-600 text-white shadow-xs'
+              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            title={navMode === 'pan' ? 'Currently in Pan/Drag mode (Left click drags scene)' : 'Switch to Drag/Pan mode'}
           >
-            <span>Iso 45°</span>
-          </button>
-          <button
-            onClick={() => setCameraView('drone')}
-            className="px-2 py-1 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1"
-            title="Aerial Drone 65°"
-          >
-            <span>Drone</span>
-          </button>
-          <button
-            onClick={() => setCameraView('top')}
-            className="px-2 py-1 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1"
-            title="Top Plan View"
-          >
-            <span>Top</span>
-          </button>
-          <button
-            onClick={() => setCameraView('eye')}
-            className="px-2 py-1 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1"
-            title="Street Eye-Level"
-          >
-            <span>Walk</span>
+            {navMode === 'pan' ? <Hand className="w-3.5 h-3.5" /> : <Rotate3d className="w-3.5 h-3.5" />}
+            <span>{navMode === 'pan' ? '✋ Drag Mode' : '🔄 Orbit Mode'}</span>
           </button>
 
-          {satelliteUrl && (
-            <>
-              <div className="h-3.5 w-px bg-slate-200" />
-              <button
-                onClick={() => setShowSatelliteMap(!showSatelliteMap)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                  showSatelliteMap
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-                title="Toggle Real Satellite Aerial Orthophoto Base Map under AOI"
-              >
-                <span>{showSatelliteMap ? '🛰️ Satellite ON' : '🛰️ Satellite OFF'}</span>
-              </button>
-            </>
-          )}
+          <div className="h-3.5 w-px bg-slate-200" />
+
+          {/* Direct Zoom Controls */}
+          <button
+            onClick={handleZoomIn}
+            className="p-1 rounded-lg text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            title="Zoom In towards buildings (+)"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={handleZoomOut}
+            className="p-1 rounded-lg text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            title="Zoom Out (-)"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 

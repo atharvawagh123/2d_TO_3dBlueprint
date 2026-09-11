@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import type { BlueprintElement, EditorTool, Point2D, SnapMode } from '../../types';
 import { distance, computeMiterOffsets, samplePointsAlongPolyline } from '../../engine/math2d';
+import { getBoundingBoxDimensions, type BoundingBoxGPS } from '../../engine/gisProjection';
 import { Check, X, Undo } from 'lucide-react';
 
 interface BlueprintCanvasProps {
@@ -15,6 +16,9 @@ interface BlueprintCanvasProps {
   onFocusElement3D: (id: string) => void;
   scale: number;
   onScaleChange: (scale: number) => void;
+  bbox?: BoundingBoxGPS;
+  streetMapUrl?: string;
+  showStreetMap?: boolean;
 }
 
 export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
@@ -29,6 +33,9 @@ export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
   onFocusElement3D,
   scale,
   onScaleChange,
+  bbox,
+  streetMapUrl,
+  showStreetMap = true,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -46,6 +53,23 @@ export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
   // Hovered element for clean floating tooltip
   const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Loaded Street Map reference image
+  const [streetMapImage, setStreetMapImage] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    if (!streetMapUrl) {
+      setStreetMapImage(null);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = streetMapUrl;
+    img.onload = () => setStreetMapImage(img);
+    img.onerror = (e) => {
+      console.warn('Failed to load street map texture for 2D blueprint', e);
+    };
+  }, [streetMapUrl]);
 
   // Convert Screen coordinates to World coordinates (Meters)
   const screenToWorld = useCallback((screenX: number, screenY: number): Point2D => {
@@ -127,6 +151,50 @@ export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
         elevation: 0,
         material_label: 'glass_curtain_wall',
         metadata: { color: '#0284c7' },
+      };
+    } else if (activeTool === 'stadium') {
+      newElement = {
+        id,
+        type: 'stadium',
+        name: `Sports Stadium ${elements.filter(e => e.type === 'stadium').length + 1}`,
+        points: currentPoints,
+        height: 26,
+        elevation: 0,
+        material_label: 'reinforced_concrete',
+        metadata: { color: '#0284c7' },
+      };
+    } else if (activeTool === 'crane') {
+      newElement = {
+        id,
+        type: 'crane',
+        name: `Tower Crane ${elements.filter(e => e.type === 'crane').length + 1}`,
+        points: currentPoints,
+        height: 55,
+        elevation: 0,
+        material_label: 'structural_steel',
+        metadata: { color: '#f59e0b', isLogisticsCrane: true },
+      };
+    } else if (activeTool === 'electric_pole') {
+      newElement = {
+        id,
+        type: 'electric_pole',
+        name: `Electric Utility Pole ${elements.filter(e => e.type === 'electric_pole').length + 1}`,
+        points: currentPoints,
+        height: 14,
+        elevation: 0,
+        material_label: 'reinforced_concrete',
+        metadata: { color: '#64748b' },
+      };
+    } else if (activeTool === 'water_pool') {
+      newElement = {
+        id,
+        type: 'water_pool',
+        name: `Water Pool / Basin ${elements.filter(e => e.type === 'water_pool').length + 1}`,
+        points: currentPoints,
+        height: 2.5,
+        elevation: 0,
+        material_label: 'mosaic_tile',
+        metadata: { color: '#0284c7', groundType: 'water' },
       };
     } else if (activeTool === 'boundary') {
       newElement = {
@@ -215,6 +283,31 @@ export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
 
     const cx = width / 2 + offset.x;
     const cy = height / 2 + offset.y;
+
+    // Reference Street Map Underlay (Streets, Intersections, Buildings)
+    if (showStreetMap && streetMapImage && bbox) {
+      const { widthMeters, heightMeters } = getBoundingBoxDimensions(bbox);
+      const halfW = widthMeters / 2;
+      const halfH = heightMeters / 2;
+
+      const sTopLeft = worldToScreen(-halfW, -halfH);
+      const sBottomRight = worldToScreen(halfW, halfH);
+
+      const drawW = sBottomRight.x - sTopLeft.x;
+      const drawH = sBottomRight.y - sTopLeft.y;
+
+      ctx.save();
+      ctx.globalAlpha = 0.82;
+      ctx.drawImage(streetMapImage, sTopLeft.x, sTopLeft.y, drawW, drawH);
+
+      // Clean reference boundary outline
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([8, 4]);
+      ctx.strokeRect(sTopLeft.x, sTopLeft.y, drawW, drawH);
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
 
     // 2. Draw Crisp Architectural Grid
     const gridSizeMajor = 50 * scale; // 50m major grid
@@ -393,6 +486,117 @@ export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
           ctx.lineWidth = isSelected ? 3 : 1.5;
           ctx.stroke();
           ctx.setLineDash([]);
+        }
+      } else if (elem.type === 'stadium') {
+        if (screenPts.length >= 3) {
+          ctx.beginPath();
+          ctx.moveTo(screenPts[0].x, screenPts[0].y);
+          for (let i = 1; i < screenPts.length; i++) {
+            ctx.lineTo(screenPts[i].x, screenPts[i].y);
+          }
+          ctx.closePath();
+          // Grandstand seating bowl fill
+          ctx.fillStyle = 'rgba(2, 132, 199, 0.18)';
+          ctx.fill();
+          ctx.strokeStyle = isSelected ? '#0284c7' : '#0369a1';
+          ctx.lineWidth = isSelected ? 3 : 2;
+          ctx.stroke();
+
+          // Draw internal pitch turf field indicator
+          const avgX = screenPts.reduce((s, p) => s + p.x, 0) / screenPts.length;
+          const avgY = screenPts.reduce((s, p) => s + p.y, 0) / screenPts.length;
+          ctx.fillStyle = 'rgba(34, 197, 94, 0.4)';
+          ctx.beginPath();
+          ctx.ellipse(avgX, avgY, 18 * scale, 12 * scale, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+
+          ctx.fillStyle = '#0f172a';
+          ctx.font = 'bold 12px sans-serif';
+          ctx.fillText('🏟️', avgX - 8, avgY + 4);
+        }
+      } else if (elem.type === 'crane') {
+        if (screenPts.length >= 1) {
+          const base = screenPts[0];
+          ctx.fillStyle = '#f59e0b';
+          ctx.beginPath();
+          ctx.arc(base.x, base.y, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = isSelected ? '#0284c7' : '#b45309';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // If second point or boom drawn, draw working jib arm
+          if (screenPts.length >= 2) {
+            ctx.beginPath();
+            ctx.moveTo(base.x, base.y);
+            ctx.lineTo(screenPts[1].x, screenPts[1].y);
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+          }
+
+          ctx.font = '13px sans-serif';
+          ctx.fillText('🏗️', base.x + 8, base.y - 8);
+        }
+      } else if (elem.type === 'electric_pole') {
+        if (screenPts.length >= 1) {
+          // Draw wire connecting poles
+          if (screenPts.length >= 2) {
+            ctx.beginPath();
+            ctx.moveTo(screenPts[0].x, screenPts[0].y);
+            for (let i = 1; i < screenPts.length; i++) {
+              ctx.lineTo(screenPts[i].x, screenPts[i].y);
+            }
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 2]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+
+          screenPts.forEach((sp) => {
+            ctx.fillStyle = '#334155';
+            ctx.beginPath();
+            ctx.arc(sp.x, sp.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Crossarm bar
+            ctx.beginPath();
+            ctx.moveTo(sp.x - 6, sp.y - 2);
+            ctx.lineTo(sp.x + 6, sp.y - 2);
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          });
+
+          ctx.font = '11px sans-serif';
+          ctx.fillText('⚡', screenPts[0].x + 6, screenPts[0].y - 6);
+        }
+      } else if (elem.type === 'water_pool') {
+        if (screenPts.length >= 3) {
+          ctx.beginPath();
+          ctx.moveTo(screenPts[0].x, screenPts[0].y);
+          for (let i = 1; i < screenPts.length; i++) {
+            ctx.lineTo(screenPts[i].x, screenPts[i].y);
+          }
+          ctx.closePath();
+          // Pool water fill
+          ctx.fillStyle = 'rgba(2, 132, 199, 0.45)';
+          ctx.fill();
+          ctx.strokeStyle = isSelected ? '#0284c7' : '#0369a1';
+          ctx.lineWidth = isSelected ? 3 : 2;
+          ctx.stroke();
+
+          const avgX = screenPts.reduce((s, p) => s + p.x, 0) / screenPts.length;
+          const avgY = screenPts.reduce((s, p) => s + p.y, 0) / screenPts.length;
+          ctx.font = '12px sans-serif';
+          ctx.fillText('💧', avgX - 6, avgY + 4);
         }
       }
 

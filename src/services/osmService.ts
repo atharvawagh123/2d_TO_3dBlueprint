@@ -15,6 +15,18 @@ export interface CivilSitePreset {
 
 export const CIVIL_SITE_PRESETS: CivilSitePreset[] = [
   {
+    id: 'mumbai_marine',
+    name: 'Mumbai Vidhan Bhavan & Marine Drive Coastal Corridor',
+    region: 'Nariman Point, Mumbai, India',
+    description: 'Arterial Vidhan Bhavan / Marine Drive corridor, government complexes, commercial towers, and coastal link.',
+    bbox: {
+      south: 18.9310,
+      west: 72.8240,
+      north: 18.9400,
+      east: 72.8350,
+    },
+  },
+  {
     id: 'nagpur_ramjhula',
     name: 'Nagpur Ram Jhula & Metro Viaduct Corridor',
     region: 'Maharashtra, India',
@@ -24,18 +36,6 @@ export const CIVIL_SITE_PRESETS: CivilSitePreset[] = [
       west: 79.0820,
       north: 21.1550,
       east: 79.0930,
-    },
-  },
-  {
-    id: 'mumbai_marine',
-    name: 'Mumbai Marine Drive & Coastal Road',
-    region: 'Maharashtra, India',
-    description: 'Arterial seaside multi-lane expressway corridor, reclaimed seawalls, and commercial towers.',
-    bbox: {
-      south: 18.9390,
-      west: 72.8180,
-      north: 18.9490,
-      east: 72.8280,
     },
   },
   {
@@ -631,9 +631,41 @@ export async function fetchAOIInfrastructure(bbox: BoundingBoxGPS): Promise<AOIF
               return;
             }
 
+            // 4.5. Sports Stadiums, Cricket Grounds, Arenas, and Athletic Pitches
+            const isStadium =
+              el.tags?.leisure === 'stadium' ||
+              el.tags?.building === 'stadium' ||
+              el.tags?.building === 'grandstand' ||
+              el.tags?.leisure === 'sports_centre' ||
+              el.tags?.sport === 'cricket' ||
+              el.tags?.sport === 'football' ||
+              el.tags?.sport === 'soccer' ||
+              (Boolean(name) && /stadium|arena|maidan|cricket|football|brabourne|wankhede/i.test(name));
+
+            if (isStadium && rawPts.length >= 3) {
+              seenIds.add(wayId);
+              const pts = sanitizePolygonPoints(rawPts);
+              if (pts.length < 3) return;
+
+              elements.push({
+                id: `osm_stadium_${el.id}`,
+                type: 'stadium',
+                name: name || 'Sports Stadium Arena',
+                points: pts,
+                height: 24,
+                elevation: 0,
+                material_label: 'stadium_arena',
+                metadata: {
+                  stadiumType: el.tags?.sport || 'stadium',
+                  osmId: el.id,
+                },
+              });
+              return;
+            }
+
             // 5. 3D Ground Parcels (Parks, Water Bodies, Parking Lots, Plazas)
             const isWater = el.tags?.natural === 'water' || el.tags?.waterway || el.tags?.landuse === 'basin' || el.tags?.landuse === 'reservoir';
-            const isPark = el.tags?.leisure === 'park' || el.tags?.leisure === 'garden' || el.tags?.leisure === 'pitch' || el.tags?.landuse === 'grass' || el.tags?.landuse === 'forest' || el.tags?.natural === 'wood';
+            const isPark = el.tags?.leisure === 'park' || el.tags?.leisure === 'garden' || el.tags?.landuse === 'grass' || el.tags?.landuse === 'forest' || el.tags?.natural === 'wood';
             const isParking = el.tags?.amenity === 'parking';
             const isPlaza = el.tags?.amenity === 'marketplace' || el.tags?.highway === 'pedestrian';
             const isZoning = el.tags?.landuse === 'commercial' || el.tags?.landuse === 'residential' || el.tags?.landuse === 'industrial';

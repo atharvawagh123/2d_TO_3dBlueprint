@@ -21,7 +21,7 @@ import { ProjectSelectorModal } from './components/layout/ProjectSelectorModal';
 import { VersionModal } from './components/layout/VersionModal';
 import { ShareModal } from './components/layout/ShareModal';
 import { SiteMapAOI } from './components/map/SiteMapAOI';
-import { getSatelliteTextureUrl, type BoundingBoxGPS } from './engine/gisProjection';
+import { getSatelliteTextureUrl, getStreetMapTextureUrl, type BoundingBoxGPS } from './engine/gisProjection';
 
 export const App: React.FC = () => {
   // Load initial projects from repository
@@ -30,7 +30,7 @@ export const App: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const viewId = params.get('view');
     if (viewId && repository.getProject(viewId)) return viewId;
-    return projects[0]?.id || 'proj_bridge_interchange';
+    return projects[0]?.id || 'proj_metropolitan_plaza';
   });
 
   // Client Public Presentation Mode Route Check
@@ -70,6 +70,7 @@ export const App: React.FC = () => {
   const [snapMode, setSnapMode] = useState<SnapMode>('1m');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [scale, setScale] = useState<number>(2.5);
+  const [showStreetMap, setShowStreetMap] = useState<boolean>(true);
 
   // Sidebar Toggles
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -145,14 +146,10 @@ export const App: React.FC = () => {
     pushHistory(updated);
   };
 
-  // Focus and Zoom in 3D - only highlights, doesn't force switch view mode
+  // Focus in 3D / Inspector - only highlights and inspects, does not force any view
   const handleFocusElement3D = (id: string) => {
     setSelectedElementId(id);
     setIsInspectorOpen(true);
-    // Only switch to 3D if already in 3D view
-    if (viewMode === 'viewer3d') {
-      setViewMode('viewer3d');
-    }
   };
 
   // Undo / Redo
@@ -200,6 +197,7 @@ export const App: React.FC = () => {
 
     const newVersionNo = versions.length + 1;
     const satelliteUrl = bbox ? getSatelliteTextureUrl(bbox) : undefined;
+    const streetMapUrl = bbox ? getStreetMapTextureUrl(bbox) : undefined;
     const newVersion: BlueprintVersion = {
       id: `ver_${currentProjectId}_0${newVersionNo}_${Date.now().toString(36)}`,
       project_id: currentProjectId,
@@ -209,6 +207,7 @@ export const App: React.FC = () => {
       notes: notes || 'GIS Live AOI Infrastructure Import',
       bbox,
       satelliteUrl,
+      streetMapUrl,
       elements: JSON.parse(JSON.stringify(importedElements)),
     };
 
@@ -244,6 +243,7 @@ export const App: React.FC = () => {
     };
 
     const satelliteUrl = bbox ? getSatelliteTextureUrl(bbox) : undefined;
+    const streetMapUrl = bbox ? getStreetMapTextureUrl(bbox) : undefined;
     const initialVersion: BlueprintVersion = {
       id: `ver_${newProj.id}_01`,
       project_id: newProj.id,
@@ -253,6 +253,7 @@ export const App: React.FC = () => {
       notes: notes || 'Geospatial AOI Survey Blueprint',
       bbox,
       satelliteUrl,
+      streetMapUrl,
       elements: JSON.parse(JSON.stringify(importedElements)),
     };
 
@@ -409,6 +410,9 @@ export const App: React.FC = () => {
                 onZoomOut={() => setScale(s => Math.max(s * 0.8, 0.2))}
                 onResetZoom={() => setScale(2.5)}
                 currentScale={scale / 2.5}
+                showStreetMap={showStreetMap}
+                onToggleStreetMap={() => setShowStreetMap(!showStreetMap)}
+                streetMapAvailable={Boolean(currentVersion?.streetMapUrl || currentVersion?.bbox)}
               />
 
               {/* 2D Canvas */}
@@ -427,6 +431,9 @@ export const App: React.FC = () => {
                 onFocusElement3D={handleFocusElement3D}
                 scale={scale}
                 onScaleChange={setScale}
+                bbox={currentVersion?.bbox}
+                streetMapUrl={currentVersion?.streetMapUrl}
+                showStreetMap={showStreetMap}
               />
             </div>
 
@@ -455,8 +462,6 @@ export const App: React.FC = () => {
                 elements={elements}
                 comments={comments}
                 selectedElementId={selectedElementId}
-                bbox={currentVersion?.bbox}
-                satelliteUrl={currentVersion?.satelliteUrl}
                 onSelectElement={(id) => {
                   setSelectedElementId(id);
                   if (id) setIsInspectorOpen(true);

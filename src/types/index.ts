@@ -11,14 +11,23 @@ export interface Project {
   description?: string;
 }
 
-export type ElementType = 'road' | 'bridge_deck' | 'boundary' | 'building' | 'ground';
+export type ElementType = 
+  | 'road' 
+  | 'bridge_deck' 
+  | 'boundary' 
+  | 'building' 
+  | 'ground' 
+  | 'stadium' 
+  | 'crane' 
+  | 'electric_pole' 
+  | 'water_pool';
 
 export interface Point2D {
   x: number;
   y: number;
 }
 
-export type GroundType = 'park' | 'water' | 'parking' | 'plaza' | 'commercial_zone' | 'residential_zone' | 'grass';
+export type GroundType = 'park' | 'water' | 'parking' | 'plaza' | 'commercial_zone' | 'residential_zone' | 'grass' | 'stadium';
 
 export interface ElementMetadata {
   lanes?: number;
@@ -37,6 +46,8 @@ export interface ElementMetadata {
   groundType?: GroundType;
   osmId?: number | string;
   isLogisticsCrane?: boolean;
+  stadiumType?: string;
+  sport?: string;
 }
 
 export interface BlueprintElement {
@@ -67,6 +78,7 @@ export interface BlueprintVersion {
     east: number;
   };
   satelliteUrl?: string;
+  streetMapUrl?: string;
 }
 
 export interface Vector3D {
@@ -87,7 +99,16 @@ export interface Comment {
   status?: 'open' | 'resolved';
 }
 
-export type EditorTool = 'select' | 'road' | 'bridge_deck' | 'boundary' | 'building';
+export type EditorTool = 
+  | 'select' 
+  | 'road' 
+  | 'bridge_deck' 
+  | 'boundary' 
+  | 'building'
+  | 'stadium'
+  | 'crane'
+  | 'electric_pole'
+  | 'water_pool';
 
 export type SnapMode = 'none' | '1m' | '5m';
 

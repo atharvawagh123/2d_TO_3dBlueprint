@@ -371,6 +371,115 @@ export const DAYLIGHT_MATERIALS = {
     roughness: 0.8,
     metalness: 0.1,
   }),
+  // Stadium
+  stadiumPitch: new THREE.MeshStandardMaterial({
+    color: 0x15803d,
+    roughness: 0.85,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+  }),
+  stadiumWicket: new THREE.MeshStandardMaterial({
+    color: 0xca8a04,
+    roughness: 0.9,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+  }),
+  stadiumMarking: new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.3,
+    side: THREE.DoubleSide,
+  }),
+  stadiumSeats: new THREE.MeshStandardMaterial({
+    color: 0x0284c7,
+    roughness: 0.55,
+    metalness: 0.15,
+    side: THREE.DoubleSide,
+  }),
+  stadiumSeatsUpper: new THREE.MeshStandardMaterial({
+    color: 0x0369a1,
+    roughness: 0.55,
+    metalness: 0.15,
+    side: THREE.DoubleSide,
+  }),
+  stadiumConcrete: new THREE.MeshStandardMaterial({
+    color: 0x94a3b8,
+    roughness: 0.75,
+    metalness: 0.1,
+    side: THREE.DoubleSide,
+  }),
+  stadiumFacade: new THREE.MeshStandardMaterial({
+    color: 0xe2e8f0,
+    roughness: 0.4,
+    metalness: 0.35,
+    side: THREE.DoubleSide,
+  }),
+  stadiumRoof: new THREE.MeshStandardMaterial({
+    color: 0x475569,
+    roughness: 0.35,
+    metalness: 0.45,
+    side: THREE.DoubleSide,
+  }),
+  stadiumPylon: new THREE.MeshStandardMaterial({
+    color: 0x334155,
+    roughness: 0.35,
+    metalness: 0.75,
+  }),
+  stadiumFloodlight: new THREE.MeshStandardMaterial({
+    color: 0xfef08a,
+    emissive: 0xfef08a,
+    emissiveIntensity: 1.2,
+  }),
+  stadiumScoreboard: new THREE.MeshStandardMaterial({
+    color: 0x0f172a,
+    roughness: 0.3,
+    metalness: 0.8,
+  }),
+  stadiumScoreboardScreen: new THREE.MeshStandardMaterial({
+    color: 0x0284c7,
+    emissive: 0x0ea5e9,
+    emissiveIntensity: 0.6,
+  }),
+  // Electric Pole & Utility
+  electricPole: new THREE.MeshStandardMaterial({
+    color: 0x78350f,
+    roughness: 0.88,
+  }),
+  electricCrossarm: new THREE.MeshStandardMaterial({
+    color: 0x451a03,
+    roughness: 0.85,
+  }),
+  electricInsulator: new THREE.MeshStandardMaterial({
+    color: 0x38bdf8,
+    roughness: 0.2,
+    metalness: 0.7,
+  }),
+  electricTransformer: new THREE.MeshStandardMaterial({
+    color: 0x64748b,
+    roughness: 0.4,
+    metalness: 0.6,
+  }),
+  electricWire: new THREE.MeshStandardMaterial({
+    color: 0x0f172a,
+    roughness: 0.3,
+    metalness: 0.85,
+  }),
+  // Water Pool
+  poolCoping: new THREE.MeshStandardMaterial({
+    color: 0xcbd5e1,
+    roughness: 0.6,
+    metalness: 0.1,
+  }),
+  poolWater: new THREE.MeshStandardMaterial({
+    color: 0x0284c7,
+    roughness: 0.05,
+    metalness: 0.85,
+    transparent: true,
+    opacity: 0.88,
+  }),
+  poolFloor: new THREE.MeshStandardMaterial({
+    color: 0x0369a1,
+    roughness: 0.5,
+  }),
 };
 
 function computeElementBounds(points: { x: number; y: number }[], elevation: number, height: number, width = 10): { center: THREE.Vector3; bounds: ElementBoundingBox } {
@@ -775,7 +884,7 @@ function createBridge3D(element: BlueprintElement): ConvertedElement3D {
 }
 
 /**
- * Constructs a true 3D lattice truss tower crane rather than a solid brown prism
+ * Constructs a high-performance 3D lattice truss tower crane with foundation, slewing cab, jib, and hook
  */
 function createTowerCrane3D(element: BlueprintElement): ConvertedElement3D {
   const points = element.points;
@@ -786,6 +895,17 @@ function createTowerCrane3D(element: BlueprintElement): ConvertedElement3D {
 
   const meshes: ConvertedMeshInfo[] = [];
   const { center, bounds } = computeElementBounds(points, elevation, height, 40);
+
+  // 0. Heavy Concrete Foundation Pad
+  const padGeom = new THREE.BoxGeometry(6, 1.2, 6);
+  meshes.push({
+    geometry: padGeom,
+    material: DAYLIGHT_MATERIALS.craneConcrete,
+    position: new THREE.Vector3(cx, elevation + 0.6, cz),
+    castShadow: true,
+    receiveShadow: true,
+    name: `${element.id}_foundation_pad`,
+  });
 
   // 1. Vertical Lattice Mast (4 corner tubular columns)
   const mastWidth = 2.4;
@@ -836,7 +956,7 @@ function createTowerCrane3D(element: BlueprintElement): ConvertedElement3D {
     name: `${element.id}_jib_boom`,
   });
 
-  // 4. Counter-Jib (Extending backward 16m) with Concrete Counterweight
+  // 4. Counter-Jib with Concrete Counterweight
   const counterJibLen = 16;
   const cJibGeom = new THREE.BoxGeometry(counterJibLen, 1.4, 1.4);
   meshes.push({
@@ -865,10 +985,575 @@ function createTowerCrane3D(element: BlueprintElement): ConvertedElement3D {
     name: `${element.id}_apex`,
   });
 
+  // 6. Hoist Trolley, Cable and Hook Spreader
+  const trolleyOffset = jibLength * 0.55;
+  const trolleyGeom = new THREE.BoxGeometry(1.2, 0.6, 1.2);
+  meshes.push({
+    geometry: trolleyGeom,
+    material: DAYLIGHT_MATERIALS.craneSteel,
+    position: new THREE.Vector3(cx + trolleyOffset, elevation + height + 1.5, cz),
+    name: `${element.id}_trolley`,
+  });
+
+  const cableDrop = height * 0.6;
+  const cableGeom = new THREE.CylinderGeometry(0.04, 0.04, cableDrop, 4);
+  meshes.push({
+    geometry: cableGeom,
+    material: DAYLIGHT_MATERIALS.electricWire,
+    position: new THREE.Vector3(cx + trolleyOffset, elevation + height + 1.5 - cableDrop / 2, cz),
+    name: `${element.id}_cable`,
+  });
+
+  const hookBlockGeom = new THREE.BoxGeometry(0.9, 0.8, 0.9);
+  meshes.push({
+    geometry: hookBlockGeom,
+    material: DAYLIGHT_MATERIALS.craneSteel,
+    position: new THREE.Vector3(cx + trolleyOffset, elevation + height + 1.5 - cableDrop, cz),
+    castShadow: true,
+    name: `${element.id}_hook_block`,
+  });
+
   return {
     id: element.id,
     name: element.name || 'Tower Crane',
-    type: 'building',
+    type: (element.type as any) || 'crane',
+    elevation,
+    center,
+    bounds,
+    meshes,
+  };
+}
+
+/**
+ * Creates an authentic, world-class 3D Stadium arena with manicured turf, central wicket,
+ * 360-degree tiered spectator seating bowl, architectural facade colonnade, open cantilevered canopy roof,
+ * dual jumbotron scoreboards, and high-mast corner floodlight towers.
+ */
+function createStadium3D(element: BlueprintElement): ConvertedElement3D {
+  const points = element.points;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  points.forEach(p => {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minZ = Math.min(minZ, -p.y);
+    maxZ = Math.max(maxZ, -p.y);
+  });
+
+  const cx = (minX + maxX) / 2;
+  const cz = (minZ + maxZ) / 2;
+  const rx = Math.max((maxX - minX) / 2, 45);
+  const rz = Math.max((maxZ - minZ) / 2, 35);
+  // Realistic urban stadium height: ~18m (approx 5-6 stories) so it is proportional to city architecture
+  const height = Math.min(Math.max(element.height || 18, 14), 22);
+  const elevation = element.elevation || 0;
+
+  const meshes: ConvertedMeshInfo[] = [];
+  const { center, bounds } = computeElementBounds(points, elevation, height, Math.max(rx, rz) * 2.5);
+
+  const scaleZ = rz / rx;
+
+  // 1. Surrounding Concrete Plinth / Ground Apron
+  const plinthGeom = new THREE.CylinderGeometry(rx * 1.08, rx * 1.10, 0.4, 32);
+  plinthGeom.scale(1, 1, scaleZ);
+  meshes.push({
+    geometry: plinthGeom,
+    material: DAYLIGHT_MATERIALS.stadiumConcrete,
+    position: new THREE.Vector3(cx, elevation + 0.2, cz),
+    receiveShadow: true,
+    name: `${element.id}_plinth`,
+  });
+
+  // 2. Central Lush Playing Field (Pitch / Infield Oval)
+  const pitchRx = rx * 0.60;
+  const turfGeom = new THREE.CylinderGeometry(pitchRx, pitchRx, 0.35, 32);
+  turfGeom.scale(1, 1, scaleZ);
+  meshes.push({
+    geometry: turfGeom,
+    material: DAYLIGHT_MATERIALS.stadiumPitch,
+    position: new THREE.Vector3(cx, elevation + 0.35, cz),
+    receiveShadow: true,
+    name: `${element.id}_turf_field`,
+  });
+
+  // 3. Central Cricket Pitch Wicket Strip
+  const wicketL = Math.min(pitchRx * 0.70, 22);
+  const wicketW = 3.6;
+  const wicketGeom = new THREE.BoxGeometry(wicketL, 0.08, wicketW);
+  meshes.push({
+    geometry: wicketGeom,
+    material: DAYLIGHT_MATERIALS.stadiumWicket,
+    position: new THREE.Vector3(cx, elevation + 0.55, cz),
+    receiveShadow: true,
+    name: `${element.id}_cricket_wicket`,
+  });
+
+  // Batting / Bowling crease markings at ends of the pitch
+  [-wicketL / 2 + 1.2, wicketL / 2 - 1.2].forEach((ox, creaseIdx) => {
+    const creaseGeom = new THREE.BoxGeometry(0.2, 0.1, wicketW * 0.9);
+    meshes.push({
+      geometry: creaseGeom,
+      material: DAYLIGHT_MATERIALS.stadiumMarking,
+      position: new THREE.Vector3(cx + ox, elevation + 0.58, cz),
+      name: `${element.id}_crease_${creaseIdx}`,
+    });
+
+    // 3 Wicket stumps at each crease
+    [-0.3, 0, 0.3].forEach((oz, stumpIdx) => {
+      const stumpGeom = new THREE.CylinderGeometry(0.04, 0.04, 0.75, 6);
+      meshes.push({
+        geometry: stumpGeom,
+        material: DAYLIGHT_MATERIALS.stadiumMarking,
+        position: new THREE.Vector3(cx + ox, elevation + 0.95, cz + oz),
+        name: `${element.id}_stump_${creaseIdx}_${stumpIdx}`,
+      });
+    });
+  });
+
+  // Oval Boundary Rope Marking Line
+  const boundaryGeom = new THREE.RingGeometry(pitchRx * 0.94, pitchRx * 0.97, 32);
+  boundaryGeom.rotateX(-Math.PI / 2);
+  boundaryGeom.scale(1, 1, scaleZ);
+  meshes.push({
+    geometry: boundaryGeom,
+    material: DAYLIGHT_MATERIALS.stadiumMarking,
+    position: new THREE.Vector3(cx, elevation + 0.56, cz),
+    name: `${element.id}_boundary_rope`,
+  });
+
+  // Infield 30-Yard Fielding Circle Line
+  const infieldCircleGeom = new THREE.RingGeometry(pitchRx * 0.55, pitchRx * 0.57, 32);
+  infieldCircleGeom.rotateX(-Math.PI / 2);
+  infieldCircleGeom.scale(1, 1, scaleZ);
+  meshes.push({
+    geometry: infieldCircleGeom,
+    material: DAYLIGHT_MATERIALS.stadiumMarking,
+    position: new THREE.Vector3(cx, elevation + 0.56, cz),
+    name: `${element.id}_infield_circle`,
+  });
+
+  // 4. 360-Degree Continuous Tiered Spectator Seating Bowl (Sloped Raked Stands)
+  // Tier 1: Lower Bowl (pitch edge to 45% height)
+  const t1H = height * 0.45;
+  const t1Geom = new THREE.CylinderGeometry(
+    rx * 0.78,
+    pitchRx,
+    t1H,
+    32,
+    1,
+    false
+  );
+  t1Geom.scale(1, 1, scaleZ);
+  meshes.push({
+    geometry: t1Geom,
+    material: DAYLIGHT_MATERIALS.stadiumSeats,
+    position: new THREE.Vector3(cx, elevation + 0.4 + t1H / 2, cz),
+    castShadow: true,
+    receiveShadow: true,
+    name: `${element.id}_bowl_tier_1`,
+  });
+
+  // Tier 2: Upper Grandstand Deck (45% to 88% height)
+  const t2H = height * 0.43;
+  const t2Geom = new THREE.CylinderGeometry(
+    rx * 0.98,
+    rx * 0.78,
+    t2H,
+    32,
+    1,
+    false
+  );
+  t2Geom.scale(1, 1, scaleZ);
+  meshes.push({
+    geometry: t2Geom,
+    material: DAYLIGHT_MATERIALS.stadiumSeatsUpper,
+    position: new THREE.Vector3(cx, elevation + 0.4 + t1H + t2H / 2, cz),
+    castShadow: true,
+    receiveShadow: true,
+    name: `${element.id}_bowl_tier_2`,
+  });
+
+  // 5. Exterior Architectural Facade Shell
+  const facadeH = height * 0.92;
+  const facadeGeom = new THREE.CylinderGeometry(rx * 1.01, rx * 1.03, facadeH, 32, 1, false);
+  facadeGeom.scale(1, 1, scaleZ);
+  meshes.push({
+    geometry: facadeGeom,
+    material: DAYLIGHT_MATERIALS.stadiumFacade,
+    position: new THREE.Vector3(cx, elevation + facadeH / 2, cz),
+    castShadow: true,
+    receiveShadow: true,
+    name: `${element.id}_facade_shell`,
+  });
+
+  // 6. 16 Structural Architectural Colonnade Pylons around exterior
+  const pylonCount = 16;
+  for (let p = 0; p < pylonCount; p++) {
+    const angle = (p * Math.PI * 2) / pylonCount;
+    const px = cx + Math.cos(angle) * (rx * 1.025);
+    const pz = cz + Math.sin(angle) * (rz * 1.025);
+
+    const colGeom = new THREE.BoxGeometry(1.4, height * 0.96, 1.4);
+    meshes.push({
+      geometry: colGeom,
+      material: DAYLIGHT_MATERIALS.stadiumPylon,
+      position: new THREE.Vector3(px, elevation + (height * 0.96) / 2, pz),
+      castShadow: true,
+      name: `${element.id}_exterior_col_${p}`,
+    });
+  }
+
+  // 7. Cantilevered Tension Canopy Roof (covers only back rows of stands, leaves 82% of bowl OPEN to the sky)
+  const roofGeom = new THREE.RingGeometry(rx * 0.82, rx * 1.06, 32);
+  roofGeom.rotateX(-Math.PI / 2);
+  roofGeom.scale(1, 1, scaleZ);
+  meshes.push({
+    geometry: roofGeom,
+    material: DAYLIGHT_MATERIALS.stadiumRoof,
+    position: new THREE.Vector3(cx, elevation + height + 0.4, cz),
+    castShadow: true,
+    receiveShadow: true,
+    name: `${element.id}_canopy_roof`,
+  });
+
+  // Outer Compression Fascia Ring on Roof
+  const fasciaGeom = new THREE.CylinderGeometry(rx * 1.065, rx * 1.065, 0.8, 32, 1, true);
+  fasciaGeom.scale(1, 1, scaleZ);
+  meshes.push({
+    geometry: fasciaGeom,
+    material: DAYLIGHT_MATERIALS.stadiumPylon,
+    position: new THREE.Vector3(cx, elevation + height + 0.4, cz),
+    castShadow: true,
+    name: `${element.id}_roof_fascia`,
+  });
+
+  // 8. Dual High-Definition Stadium Jumbotron Video Scoreboards
+  [
+    { name: 'north', posZ: cz - rz * 0.94, rotY: 0 },
+    { name: 'south', posZ: cz + rz * 0.94, rotY: Math.PI },
+  ].forEach((board) => {
+    // Scoreboard Frame
+    const frameGeom = new THREE.BoxGeometry(11, 5.2, 1.0);
+    meshes.push({
+      geometry: frameGeom,
+      material: DAYLIGHT_MATERIALS.stadiumScoreboard,
+      position: new THREE.Vector3(cx, elevation + height * 0.82, board.posZ),
+      castShadow: true,
+      name: `${element.id}_scoreboard_frame_${board.name}`,
+    });
+
+    // Scoreboard Digital LED Display Screen
+    const screenGeom = new THREE.BoxGeometry(10.2, 4.6, 0.15);
+    meshes.push({
+      geometry: screenGeom,
+      material: DAYLIGHT_MATERIALS.stadiumScoreboardScreen,
+      position: new THREE.Vector3(
+        cx,
+        elevation + height * 0.82,
+        board.posZ + (board.name === 'north' ? 0.52 : -0.52)
+      ),
+      name: `${element.id}_scoreboard_screen_${board.name}`,
+    });
+  });
+
+  // 9. 4 Giant Corner High-Mast Floodlight Pylons positioned gracefully outside the stadium
+  const floodlightAngles = [
+    Math.PI * 0.25, // NE
+    Math.PI * 0.75, // SE
+    Math.PI * 1.25, // SW
+    Math.PI * 1.75, // NW
+  ];
+
+  floodlightAngles.forEach((ang, idx) => {
+    const fx = cx + Math.cos(ang) * (rx * 1.25);
+    const fz = cz + Math.sin(ang) * (rz * 1.25);
+    const mastHeight = height * 1.55;
+
+    // Tapered Steel Lattice Mast
+    const mastGeom = new THREE.CylinderGeometry(0.4, 1.2, mastHeight, 8);
+    meshes.push({
+      geometry: mastGeom,
+      material: DAYLIGHT_MATERIALS.stadiumPylon,
+      position: new THREE.Vector3(fx, elevation + mastHeight / 2, fz),
+      castShadow: true,
+      name: `${element.id}_floodlight_mast_${idx}`,
+    });
+
+    // Multi-tier lighting rack gantry head
+    const gantryGeom = new THREE.BoxGeometry(5.2, 2.6, 1.0);
+    meshes.push({
+      geometry: gantryGeom,
+      material: DAYLIGHT_MATERIALS.stadiumPylon,
+      position: new THREE.Vector3(fx, elevation + mastHeight, fz),
+      castShadow: true,
+      name: `${element.id}_floodlight_gantry_${idx}`,
+    });
+
+    // Glowing Emissive Floodlight Array Panel
+    const lampGeom = new THREE.BoxGeometry(4.8, 2.2, 0.2);
+    meshes.push({
+      geometry: lampGeom,
+      material: DAYLIGHT_MATERIALS.stadiumFloodlight,
+      position: new THREE.Vector3(
+        fx - Math.cos(ang) * 0.5,
+        elevation + mastHeight,
+        fz - Math.sin(ang) * 0.5
+      ),
+      name: `${element.id}_floodlight_lamps_${idx}`,
+    });
+  });
+
+  return {
+    id: element.id,
+    name: element.name || 'Athletic Stadium',
+    type: 'stadium',
+    elevation,
+    center,
+    bounds,
+    meshes,
+  };
+}
+
+/**
+ * Creates 3D Electric Utility Poles with crossarms, ceramic insulators, transformer, and overhead catenary wires
+ */
+function createElectricPole3D(element: BlueprintElement): ConvertedElement3D {
+  const points = element.points;
+  const poleHeight = Math.max(element.height || 11, 8);
+  const elevation = element.elevation || 0;
+  const meshes: ConvertedMeshInfo[] = [];
+  const { center, bounds } = computeElementBounds(points, elevation, poleHeight, 15);
+
+  const poleCoords: { x: number; z: number }[] = [];
+
+  points.forEach((pt) => {
+    poleCoords.push({ x: pt.x, z: -pt.y });
+  });
+
+  // Create a utility pole assembly at each coordinate
+  poleCoords.forEach((coord, i) => {
+    // 1. Main Pole Mast (treated timber or galvanized concrete)
+    const poleGeom = new THREE.CylinderGeometry(0.18, 0.26, poleHeight, 8);
+    meshes.push({
+      geometry: poleGeom,
+      material: DAYLIGHT_MATERIALS.electricPole,
+      position: new THREE.Vector3(coord.x, elevation + poleHeight / 2, coord.z),
+      castShadow: true,
+      name: `${element.id}_pole_${i}`,
+    });
+
+    // 2. Upper Crossarm
+    const topArmGeom = new THREE.BoxGeometry(2.8, 0.16, 0.16);
+    meshes.push({
+      geometry: topArmGeom,
+      material: DAYLIGHT_MATERIALS.electricCrossarm,
+      position: new THREE.Vector3(coord.x, elevation + poleHeight - 0.35, coord.z),
+      name: `${element.id}_top_arm_${i}`,
+    });
+
+    // 3. Lower Crossarm (Secondary)
+    const btmArmGeom = new THREE.BoxGeometry(3.6, 0.16, 0.16);
+    meshes.push({
+      geometry: btmArmGeom,
+      material: DAYLIGHT_MATERIALS.electricCrossarm,
+      position: new THREE.Vector3(coord.x, elevation + poleHeight - 1.4, coord.z),
+      name: `${element.id}_btm_arm_${i}`,
+    });
+
+    // 4. Ceramic Disc Insulators
+    [-1.2, 0, 1.2].forEach((offset, insIdx) => {
+      const insGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.25, 6);
+      meshes.push({
+        geometry: insGeom,
+        material: DAYLIGHT_MATERIALS.electricInsulator,
+        position: new THREE.Vector3(coord.x + offset, elevation + poleHeight - 0.18, coord.z),
+        name: `${element.id}_insulator_top_${i}_${insIdx}`,
+      });
+    });
+
+    [-1.6, 1.6].forEach((offset, insIdx) => {
+      const insGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.25, 6);
+      meshes.push({
+        geometry: insGeom,
+        material: DAYLIGHT_MATERIALS.electricInsulator,
+        position: new THREE.Vector3(coord.x + offset, elevation + poleHeight - 1.25, coord.z),
+        name: `${element.id}_insulator_btm_${i}_${insIdx}`,
+      });
+    });
+
+    // 5. Pole-mounted Distribution Transformer (every alternating pole)
+    if (i % 2 === 0) {
+      const transformerGeom = new THREE.CylinderGeometry(0.32, 0.32, 0.95, 8);
+      meshes.push({
+        geometry: transformerGeom,
+        material: DAYLIGHT_MATERIALS.electricTransformer,
+        position: new THREE.Vector3(coord.x + 0.45, elevation + poleHeight - 2.5, coord.z),
+        castShadow: true,
+        name: `${element.id}_transformer_${i}`,
+      });
+    }
+  });
+
+  // 6. Overhead Catenary Transmission Wires connecting consecutive poles
+  if (poleCoords.length > 1) {
+    for (let i = 0; i < poleCoords.length - 1; i++) {
+      const p1 = poleCoords[i];
+      const p2 = poleCoords[i + 1];
+      const dist = Math.hypot(p2.x - p1.x, p2.z - p1.z);
+      if (dist < 0.5) continue;
+
+      const offsets = [-1.2, 0, 1.2];
+      offsets.forEach((ox, wireIdx) => {
+        const start = new THREE.Vector3(p1.x + ox, elevation + poleHeight - 0.2, p1.z);
+        const end = new THREE.Vector3(p2.x + ox, elevation + poleHeight - 0.2, p2.z);
+        const sag = Math.min(dist * 0.04, 1.4);
+        const mid = new THREE.Vector3((p1.x + p2.x) / 2 + ox, elevation + poleHeight - 0.2 - sag, (p1.z + p2.z) / 2);
+
+        const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+        const wireGeom = new THREE.TubeGeometry(curve, 8, 0.03, 4, false);
+
+        meshes.push({
+          geometry: wireGeom,
+          material: DAYLIGHT_MATERIALS.electricWire,
+          name: `${element.id}_cable_${i}_${wireIdx}`,
+        });
+      });
+    }
+  }
+
+  return {
+    id: element.id,
+    name: element.name || 'Electric Utility Grid',
+    type: 'electric_pole',
+    elevation,
+    center,
+    bounds,
+    meshes,
+  };
+}
+
+/**
+ * Creates 3D Water Pool / Basin with concrete coping rim, sunken bed, translucent water surface, and fountain jet
+ */
+function createWaterPool3D(element: BlueprintElement): ConvertedElement3D {
+  const points = ensureCCW(element.points);
+  const elevation = element.elevation || 0.05;
+  const depth = Math.max(element.height || 2.5, 1.2);
+  const meshes: ConvertedMeshInfo[] = [];
+  const { center, bounds } = computeElementBounds(points, elevation, depth, 15);
+
+  if (points.length < 3) {
+    return {
+      id: element.id,
+      name: element.name || 'Water Pool Basin',
+      type: 'water_pool',
+      elevation,
+      center,
+      bounds,
+      meshes,
+    };
+  }
+
+  // 1. Water Surface Plane (translucent cyan-blue)
+  const waterShape = new THREE.Shape();
+  waterShape.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    waterShape.lineTo(points[i].x, points[i].y);
+  }
+  waterShape.closePath();
+
+  const waterGeom = new THREE.ShapeGeometry(waterShape);
+  waterGeom.rotateX(-Math.PI / 2);
+  meshes.push({
+    geometry: waterGeom,
+    material: DAYLIGHT_MATERIALS.poolWater,
+    position: new THREE.Vector3(0, elevation + 0.15, 0),
+    receiveShadow: true,
+    name: `${element.id}_water_surface`,
+  });
+
+  // 2. Sunken Pool Basin Floor
+  const floorGeom = new THREE.ShapeGeometry(waterShape);
+  floorGeom.rotateX(-Math.PI / 2);
+  meshes.push({
+    geometry: floorGeom,
+    material: DAYLIGHT_MATERIALS.poolFloor,
+    position: new THREE.Vector3(0, elevation - depth + 0.2, 0),
+    receiveShadow: true,
+    name: `${element.id}_pool_floor`,
+  });
+
+  // 3. Concrete Coping Perimeter Curb Rim
+  const closedPts = [...points, points[0]];
+  const { left, right } = computeMiterOffsets(closedPts, 0.5);
+  const n = closedPts.length;
+
+  const vertices: number[] = [];
+  const indices: number[] = [];
+  const curbH = 0.35;
+
+  for (let i = 0; i < n; i++) {
+    vertices.push(left[i].x, elevation + curbH, -left[i].y);
+    vertices.push(right[i].x, elevation + curbH, -right[i].y);
+    vertices.push(left[i].x, elevation - depth + 0.2, -left[i].y);
+    vertices.push(right[i].x, elevation - depth + 0.2, -right[i].y);
+  }
+
+  for (let i = 0; i < n - 1; i++) {
+    const tL0 = i * 4;
+    const tR0 = i * 4 + 1;
+    const bL0 = i * 4 + 2;
+    const bR0 = i * 4 + 3;
+
+    const tL1 = (i + 1) * 4;
+    const tR1 = (i + 1) * 4 + 1;
+    const bL1 = (i + 1) * 4 + 2;
+    const bR1 = (i + 1) * 4 + 3;
+
+    indices.push(tL0, tR0, tR1);
+    indices.push(tL0, tR1, tL1);
+    indices.push(tL0, tL1, bL1);
+    indices.push(tL0, bL1, bL0);
+    indices.push(tR0, bR1, tR1);
+    indices.push(tR0, bR0, bR1);
+  }
+
+  const curbGeom = new THREE.BufferGeometry();
+  curbGeom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  curbGeom.setIndex(indices);
+  curbGeom.computeVertexNormals();
+
+  meshes.push({
+    geometry: curbGeom,
+    material: DAYLIGHT_MATERIALS.poolCoping,
+    castShadow: true,
+    receiveShadow: true,
+    name: `${element.id}_coping_rim`,
+  });
+
+  // 4. Central Aerator / Fountain Spout Jet
+  const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
+  const cz = points.reduce((s, p) => s + (-p.y), 0) / points.length;
+
+  const nozzleGeom = new THREE.CylinderGeometry(0.2, 0.25, 0.6, 8);
+  meshes.push({
+    geometry: nozzleGeom,
+    material: DAYLIGHT_MATERIALS.hvacMetal,
+    position: new THREE.Vector3(cx, elevation + 0.3, cz),
+    name: `${element.id}_fountain_nozzle`,
+  });
+
+  const sprayGeom = new THREE.ConeGeometry(0.6, 2.0, 8);
+  meshes.push({
+    geometry: sprayGeom,
+    material: DAYLIGHT_MATERIALS.poolWater,
+    position: new THREE.Vector3(cx, elevation + 1.3, cz),
+    name: `${element.id}_fountain_spray`,
+  });
+
+  return {
+    id: element.id,
+    name: element.name || 'Water Pool Basin',
+    type: 'water_pool',
     elevation,
     center,
     bounds,
@@ -1165,7 +1850,12 @@ function createGround3D(element: BlueprintElement): ConvertedElement3D {
   });
 
   // For Parks: Scatter 3D Low-Poly Trees along interior points
-  if (groundType === 'park' && bounds.size.x > 15 && bounds.size.z > 15) {
+  if (
+    groundType === 'park' && 
+    bounds.size.x > 15 && 
+    bounds.size.z > 15 &&
+    !/stadium|maidan|cricket|pitch|arena|sports|brabourne|wankhede/i.test(element.name || '')
+  ) {
     const treeCount = Math.min(Math.floor((bounds.size.x * bounds.size.z) / 450), 10);
     const bMin = bounds.min;
     const bSize = bounds.size;
@@ -1365,25 +2055,107 @@ export function blueprintTo3D(elements: BlueprintElement[]): ConvertedScene3D {
   const min = new THREE.Vector3(Infinity, Infinity, Infinity);
   const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
 
+  // 1. Identify any stadium footprints to avoid overlapping/colliding buildings or cranes
+  const stadiumZones: { cx: number; cz: number; rx: number; rz: number }[] = [];
+  for (const el of elements) {
+    const isStadium =
+      el.type === 'stadium' ||
+      (el.type === 'ground' && /stadium|arena|pitch|maidan|cricket|football|brabourne|wankhede|sports/i.test(el.name || '')) ||
+      (el.type === 'building' && /stadium|arena|grandstand/i.test(el.name || ''));
+
+    if (isStadium && el.points && el.points.length > 0) {
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      el.points.forEach(p => {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minZ = Math.min(minZ, -p.y);
+        maxZ = Math.max(maxZ, -p.y);
+      });
+      const cx = (minX + maxX) / 2;
+      const cz = (minZ + maxZ) / 2;
+      const rx = Math.max((maxX - minX) / 2, 45);
+      const rz = Math.max((maxZ - minZ) / 2, 35);
+      stadiumZones.push({ cx, cz, rx: rx * 1.15, rz: rz * 1.15 });
+    }
+  }
+
   for (const element of elements) {
     if (!element.points || element.points.length === 0) continue;
 
+    const isThisAStadium =
+      element.type === 'stadium' ||
+      (element.type === 'ground' && /stadium|arena|pitch|maidan|cricket|football|brabourne|wankhede|sports/i.test(element.name || '')) ||
+      (element.type === 'building' && /stadium|arena|grandstand/i.test(element.name || ''));
+
+    // Check if element is positioned inside a stadium zone
+    const isInsideStadium = stadiumZones.some(zone => {
+      const ecx = element.points.reduce((s, p) => s + p.x, 0) / element.points.length;
+      const ecz = element.points.reduce((s, p) => s + (-p.y), 0) / element.points.length;
+      const dx = (ecx - zone.cx) / zone.rx;
+      const dz = (ecz - zone.cz) / zone.rz;
+      return dx * dx + dz * dz < 1.0;
+    });
+
+    // If an ordinary building or ground parcel is inside the stadium bowl, skip it so it doesn't poke through!
+    if (isInsideStadium && !isThisAStadium && (element.type === 'building' || element.type === 'ground')) {
+      continue;
+    }
+
+    let workingElement = element;
+    // If a crane is inside the stadium, offset it outside the stadium perimeter to the logistics gate
+    if (isInsideStadium && (element.type === 'crane' || element.metadata?.isLogisticsCrane)) {
+      const zone = stadiumZones[0];
+      const offsetPoints = element.points.map(p => ({
+        x: p.x + (zone.rx + 20),
+        y: p.y - 15,
+      }));
+      workingElement = { ...element, points: offsetPoints };
+    }
+
     let converted: ConvertedElement3D | null = null;
-    switch (element.type) {
+    switch (workingElement.type) {
       case 'road':
-        converted = createRoad3D(element);
+        converted = createRoad3D(workingElement);
         break;
       case 'bridge_deck':
-        converted = createBridge3D(element);
+        converted = createBridge3D(workingElement);
         break;
       case 'building':
-        converted = createBuilding3D(element);
+        if (
+          /stadium|arena|grandstand/i.test(workingElement.name || '') ||
+          workingElement.metadata?.buildingType === 'stadium' ||
+          workingElement.metadata?.buildingType === 'grandstand'
+        ) {
+          converted = createStadium3D(workingElement);
+          break;
+        }
+        converted = createBuilding3D(workingElement);
         break;
       case 'ground':
-        converted = createGround3D(element);
+        if (
+          /stadium|arena|pitch|maidan|cricket|football|brabourne|wankhede|sports/i.test(workingElement.name || '') ||
+          workingElement.metadata?.groundType === 'stadium' ||
+          workingElement.metadata?.sport
+        ) {
+          converted = createStadium3D(workingElement);
+          break;
+        }
+        converted = createGround3D(workingElement);
         break;
       case 'boundary':
-        converted = createBoundary3D(element);
+        converted = createBoundary3D(workingElement);
+        break;
+      case 'stadium':
+        converted = createStadium3D(workingElement);
+        break;
+      case 'crane':
+        converted = createTowerCrane3D(workingElement);
+        break;
+      case 'electric_pole':
+        converted = createElectricPole3D(workingElement);
+        break;
+      case 'water_pool':
+        converted = createWaterPool3D(workingElement);
         break;
     }
 

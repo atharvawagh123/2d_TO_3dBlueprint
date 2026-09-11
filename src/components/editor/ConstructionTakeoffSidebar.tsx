@@ -173,8 +173,12 @@ export const ConstructionTakeoffSidebar: React.FC<ConstructionTakeoffSidebarProp
             let dimensionLabel = '';
             if (elem.type === 'road' || elem.type === 'bridge_deck') {
               dimensionLabel = `${Math.round(polylineLength(elem.points))}m • ${elem.width || 10}m W`;
-            } else if (elem.type === 'building') {
+            } else if (elem.type === 'building' || elem.type === 'stadium' || elem.type === 'water_pool') {
               dimensionLabel = `${elem.height || 15}m H • ${Math.round(Math.abs(polygonArea(elem.points)))}m²`;
+            } else if (elem.type === 'crane') {
+              dimensionLabel = `${elem.height || 55}m Mast • 55m radius`;
+            } else if (elem.type === 'electric_pole') {
+              dimensionLabel = `${elem.points.length} pole${elem.points.length > 1 ? 's' : ''} • ${elem.height || 11}m H`;
             } else {
               dimensionLabel = `${Math.round(Math.abs(polygonArea(elem.points)))}m² plot`;
             }
@@ -183,9 +187,13 @@ export const ConstructionTakeoffSidebar: React.FC<ConstructionTakeoffSidebarProp
             const iconMap: Record<string, string> = {
               road: '🛣️',
               bridge_deck: '🌉',
-              building: '🏢',
+              building: elem.metadata?.isLogisticsCrane ? '🏗️' : '🏢',
               boundary: '📍',
               ground: groundIcon,
+              stadium: '🏟️',
+              crane: '🏗️',
+              electric_pole: '⚡',
+              water_pool: '💧',
             };
 
             return (

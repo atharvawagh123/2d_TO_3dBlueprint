@@ -1,17 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { EditorTool, SnapMode } from '../../types';
 import { 
   MousePointer, 
-  Milestone, 
-  Building2, 
-  MapPin, 
   Grid3X3, 
   Undo2, 
   Redo2, 
   Trash2, 
   ZoomIn, 
   ZoomOut, 
-  RotateCcw
+  RotateCcw,
+  ChevronDown
 } from 'lucide-react';
 
 interface EditorToolbarProps {
@@ -29,6 +27,9 @@ interface EditorToolbarProps {
   onZoomOut: () => void;
   onResetZoom: () => void;
   currentScale: number;
+  showStreetMap?: boolean;
+  onToggleStreetMap?: () => void;
+  streetMapAvailable?: boolean;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
@@ -46,39 +47,96 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onZoomOut,
   onResetZoom,
   currentScale,
+  showStreetMap = true,
+  onToggleStreetMap,
+  streetMapAvailable = false,
 }) => {
-  const tools: { id: EditorTool; label: string; icon: React.ReactNode }[] = [
-    { id: 'select', label: 'Select & Move', icon: <MousePointer className="w-3.5 h-3.5" /> },
-    { id: 'road', label: 'Draw Road', icon: <Milestone className="w-3.5 h-3.5" /> },
-    { id: 'bridge_deck', label: 'Bridge Viaduct', icon: <span className="text-xs">🌉</span> },
-    { id: 'building', label: 'Building', icon: <Building2 className="w-3.5 h-3.5" /> },
-    { id: 'boundary', label: 'Boundary', icon: <MapPin className="w-3.5 h-3.5" /> },
+  const [isToolDropdownOpen, setIsToolDropdownOpen] = useState(false);
+
+  const drawTools: { id: EditorTool; label: string; icon: string; category: string; desc: string }[] = [
+    { id: 'road', label: 'Road Corridor', icon: '🛣️', category: 'Infrastructure', desc: 'Polyline corridor with lanes' },
+    { id: 'bridge_deck', label: 'Bridge Viaduct', icon: '🌉', category: 'Infrastructure', desc: 'Elevated spans & piers' },
+    { id: 'electric_pole', label: 'Electric Utility Pole', icon: '⚡', category: 'Infrastructure', desc: 'Power poles & wires' },
+    { id: 'building', label: 'Building Block', icon: '🏢', category: 'Structures', desc: 'Extruded building footprint' },
+    { id: 'stadium', label: 'Stadium Arena', icon: '🏟️', category: 'Structures', desc: 'Grandstands, pitch & roof' },
+    { id: 'crane', label: 'Tower Crane', icon: '🏗️', category: 'Logistics', desc: 'Lattice mast, jib & hoist' },
+    { id: 'water_pool', label: 'Water Pool / Basin', icon: '💧', category: 'Environment', desc: 'Aquatic basin & fountain' },
+    { id: 'boundary', label: 'Site Boundary', icon: '📍', category: 'Site', desc: 'Survey boundary polygon' },
   ];
 
+  const activeDrawTool = drawTools.find(t => t.id === activeTool);
   const snapOptions: SnapMode[] = ['none', '1m', '5m'];
 
   return (
     <div className="absolute top-3 left-3 z-20 flex items-center gap-2 pointer-events-auto">
-      {/* Primary Drafting Tools Panel */}
+      {/* Primary Drafting Tools Panel with Dropdown */}
       <div className="light-panel p-1 rounded-xl flex items-center gap-1 shadow-sm">
-        {tools.map((t) => {
-          const isActive = activeTool === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => onSelectTool(t.id)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                isActive
-                  ? 'bg-sky-600 text-white shadow-sm font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-              title={t.label}
-            >
-              {t.icon}
-              <span>{t.label}</span>
-            </button>
-          );
-        })}
+        {/* Quick Select & Move */}
+        <button
+          onClick={() => {
+            onSelectTool('select');
+            setIsToolDropdownOpen(false);
+          }}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            activeTool === 'select'
+              ? 'bg-sky-600 text-white shadow-sm font-semibold'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+          title="Select & Move elements"
+        >
+          <MousePointer className="w-3.5 h-3.5" />
+          <span>Select</span>
+        </button>
+
+        {/* Add Element Tool Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setIsToolDropdownOpen(!isToolDropdownOpen)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTool !== 'select'
+                ? 'bg-sky-600 text-white shadow-sm'
+                : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+            }`}
+            title="Choose drawing element tool"
+          >
+            <span>{activeDrawTool ? activeDrawTool.icon : '✏️'}</span>
+            <span>{activeDrawTool ? activeDrawTool.label : 'Add Element'}</span>
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isToolDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isToolDropdownOpen && (
+            <div className="absolute top-full mt-1.5 left-0 w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Draft 2D & 3D Element
+              </div>
+              <div className="max-h-72 overflow-y-auto space-y-0.5 mt-1">
+                {drawTools.map((tool) => {
+                  const isCur = activeTool === tool.id;
+                  return (
+                    <button
+                      key={tool.id}
+                      onClick={() => {
+                        onSelectTool(tool.id);
+                        setIsToolDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-left transition-colors ${
+                        isCur
+                          ? 'bg-sky-50 text-sky-800 font-bold border border-sky-200'
+                          : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="text-base shrink-0">{tool.icon}</span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-semibold">{tool.label}</span>
+                        <span className="text-[10px] text-slate-400 truncate">{tool.desc}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="h-4 w-px bg-slate-200 mx-0.5" />
 
@@ -160,6 +218,23 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
+
+        {streetMapAvailable && (
+          <>
+            <div className="h-3.5 w-px bg-slate-200 mx-0.5" />
+            <button
+              onClick={onToggleStreetMap}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                showStreetMap
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="Toggle Reference Street Map Underlay (Streets, Intersections & Buildings)"
+            >
+              <span>{showStreetMap ? '🗺️ Street Map ON' : '🗺️ Street Map OFF'}</span>
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

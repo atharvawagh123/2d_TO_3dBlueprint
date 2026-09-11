@@ -67,11 +67,11 @@ export const SiteMapAOI: React.FC<SiteMapAOIProps> = ({
   const featuresLayerRef = useRef<L.LayerGroup | null>(null);
   const activeRequestIdRef = useRef<number>(0);
 
-  // Active state - Default to Central India (Nagpur Ram Jhula & Metro)
+  // Active state - Default to Mumbai Vidhan Bhavan Square / Marine Drive
   const [selectedPreset, setSelectedPreset] = useState<CivilSitePreset | null>(CIVIL_SITE_PRESETS[0]);
   const [activeBbox, setActiveBbox] = useState<BoundingBoxGPS | null>(CIVIL_SITE_PRESETS[0].bbox);
   const [activeLocationName, setActiveLocationName] = useState<string>(CIVIL_SITE_PRESETS[0].name);
-  const [tileMode, setTileMode] = useState<MapTileProvider>('satellite');
+  const [tileMode, setTileMode] = useState<MapTileProvider>('streets');
 
   // Drawing mode state
   const [isDrawingMode, setIsDrawingMode] = useState(false);
@@ -101,17 +101,17 @@ export const SiteMapAOI: React.FC<SiteMapAOIProps> = ({
 
     const map = L.map(mapContainerRef.current, {
       center: [initialCenterLat, initialCenterLon],
-      zoom: 16,
+      zoom: 17,
       zoomControl: false,
     });
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Initial tile layer (Free Esri World Imagery Satellite)
+    // Initial tile layer (OpenStreetMap standard street tiles)
     const initialTiles = L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       {
-        attribution: 'Tiles &copy; Esri World Imagery (Free)',
+        attribution: '&copy; OpenStreetMap contributors',
         maxZoom: 19,
       }
     ).addTo(map);
@@ -963,7 +963,7 @@ export const SiteMapAOI: React.FC<SiteMapAOIProps> = ({
       {/* Center Live Leaflet Map Stage */}
       <div className="flex-1 h-full relative overflow-hidden flex flex-col">
         {/* Top Controls Floating Bar */}
-        <div className="absolute top-3 left-4 right-4 z-1000 flex items-center justify-between gap-3 pointer-events-none">
+        <div className="absolute top-3 left-4 right-4 z-[450] flex items-center justify-between gap-3 pointer-events-none">
           {/* Left: Location Search Bar */}
           <div className="relative pointer-events-auto w-80">
             <form onSubmit={handleSearchSubmit} className="relative flex items-center">

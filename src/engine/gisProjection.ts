@@ -93,3 +93,15 @@ export function getSatelliteTextureUrl(
 ): string {
   return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bbox.west},${bbox.south},${bbox.east},${bbox.north}&bboxSR=4326&imageSR=4326&size=${width},${height}&format=jpg&f=image`;
 }
+
+/**
+ * Generates a crisp reference street map image URL from Esri World Street Map REST service
+ * for a specific GPS bounding box. Shows road alignments, street names, intersections, and building footprints.
+ */
+export function getStreetMapTextureUrl(
+  bbox: BoundingBoxGPS,
+  width = 1024,
+  height = 1024
+): string {
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/export?bbox=${bbox.west},${bbox.south},${bbox.east},${bbox.north}&bboxSR=4326&imageSR=4326&size=${width},${height}&format=png&f=image`;
+}

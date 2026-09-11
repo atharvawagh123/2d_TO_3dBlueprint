@@ -88,8 +88,6 @@ export const ClientView: React.FC<ClientViewProps> = ({
           <ThreeCanvas
             elements={version.elements}
             comments={comments}
-            bbox={version.bbox}
-            satelliteUrl={version.satelliteUrl}
             onAddComment={onAddComment}
             readOnly={true}
           />
