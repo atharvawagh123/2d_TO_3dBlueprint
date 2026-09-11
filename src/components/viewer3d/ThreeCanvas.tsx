@@ -4,7 +4,6 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { BlueprintElement, Comment, Vector3D } from '../../types';
 import { blueprintTo3D, type ConvertedScene3D } from '../../engine/blueprintTo3D';
 import { exportToGLB, captureCanvasScreenshot } from '../../services/exportService';
-import { getBoundingBoxDimensions, type BoundingBoxGPS } from '../../engine/gisProjection';
 import {
   Camera,
   Download,
@@ -25,8 +24,6 @@ interface ThreeCanvasProps {
   onAddComment: (pos: Vector3D, text: string, author: string) => void;
   onSwitchTo2D?: () => void;
   readOnly?: boolean;
-  bbox?: BoundingBoxGPS;
-  satelliteUrl?: string;
 }
 
 export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
@@ -37,8 +34,6 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   onAddComment,
   onSwitchTo2D,
   readOnly = false,
-  bbox,
-  satelliteUrl,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -78,9 +73,7 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [isLayersDrawerOpen, setIsLayersDrawerOpen] = useState(true);
   const [showMiniHud, setShowMiniHud] = useState(true);
-  const [showSatelliteMap, setShowSatelliteMap] = useState(true);
   const miniCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const satelliteMeshRef = useRef<THREE.Mesh | null>(null);
 
   // Converted 3D scene data
   const [convertedData, setConvertedData] = useState<ConvertedScene3D | null>(null);
@@ -234,70 +227,6 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
       renderer.dispose();
     };
   }, []);
-
-  // Satellite Aerial Base Imagery Projection directly beneath AOI
-  useEffect(() => {
-    if (!sceneRef.current) return;
-
-    if (satelliteMeshRef.current) {
-      sceneRef.current.remove(satelliteMeshRef.current);
-      satelliteMeshRef.current.geometry.dispose();
-      if (Array.isArray(satelliteMeshRef.current.material)) {
-        satelliteMeshRef.current.material.forEach((m) => m.dispose());
-      } else if (satelliteMeshRef.current.material) {
-        satelliteMeshRef.current.material.dispose();
-      }
-      satelliteMeshRef.current = null;
-    }
-
-    if (!satelliteUrl || !bbox || !showSatelliteMap) return;
-
-    const { widthMeters, heightMeters } = getBoundingBoxDimensions(bbox);
-
-    const loader = new THREE.TextureLoader();
-    loader.load(
-      satelliteUrl,
-      (texture) => {
-        if (!sceneRef.current) return;
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.generateMipmaps = true;
-        texture.minFilter = THREE.LinearMipmapLinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-
-        const geom = new THREE.PlaneGeometry(widthMeters, heightMeters);
-        const mat = new THREE.MeshStandardMaterial({
-          map: texture,
-          roughness: 0.92,
-          metalness: 0.04,
-        });
-
-        const mesh = new THREE.Mesh(geom, mat);
-        mesh.rotation.x = -Math.PI / 2;
-        // Position slightly above the infinite terrain plane (-0.05) and below elements (0.00+)
-        mesh.position.set(0, -0.015, 0);
-        mesh.receiveShadow = true;
-        mesh.name = 'satellite_base_aoi_plane';
-
-        sceneRef.current.add(mesh);
-        satelliteMeshRef.current = mesh;
-      },
-      undefined,
-      (err) => {
-        console.warn('Failed to load satellite texture in 3D viewer', err);
-      }
-    );
-
-    return () => {
-      if (satelliteMeshRef.current && sceneRef.current) {
-        sceneRef.current.remove(satelliteMeshRef.current);
-        satelliteMeshRef.current.geometry.dispose();
-        if (satelliteMeshRef.current.material) {
-          (satelliteMeshRef.current.material as THREE.Material).dispose();
-        }
-        satelliteMeshRef.current = null;
-      }
-    };
-  }, [satelliteUrl, bbox, showSatelliteMap]);
 
   // Update 3D Geometry when elements change & Auto-frame initial scene!
   useEffect(() => {
@@ -728,8 +657,8 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
                     key={elem.id}
                     onClick={() => onSelectElement?.(elem.id)}
                     className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs transition-all ${isSelected
-                        ? 'bg-sky-600 text-white font-bold shadow-xs'
-                        : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-sky-600 text-white font-bold shadow-xs'
+                      : 'text-slate-700 hover:bg-slate-100'
                       }`}
                   >
                     <div className="flex items-center gap-2 truncate pr-1">
@@ -752,8 +681,8 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
               setSelectedComment(null);
             }}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${commentMode
-                ? 'bg-amber-500 text-white animate-pulse'
-                : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-amber-500 text-white animate-pulse'
+              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
               }`}
           >
             <MessageSquarePlus className="w-3.5 h-3.5" />
@@ -790,22 +719,6 @@ export const ThreeCanvas: React.FC<ThreeCanvasProps> = ({
           >
             <span>Walk</span>
           </button>
-
-          {satelliteUrl && (
-            <>
-              <div className="h-3.5 w-px bg-slate-200" />
-              <button
-                onClick={() => setShowSatelliteMap(!showSatelliteMap)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${showSatelliteMap
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                title="Toggle Real Satellite Aerial Orthophoto Base Map under AOI"
-              >
-                <span>{showSatelliteMap ? '🛰️ Satellite ON' : '🛰️ Satellite OFF'}</span>
-              </button>
-            </>
-          )}
         </div>
       </div>
 
