@@ -149,8 +149,8 @@ export const App: React.FC = () => {
   const handleFocusElement3D = (id: string) => {
     setSelectedElementId(id);
     setIsInspectorOpen(true);
-    // Only switch to 3D if already in split or 3D view
-    if (viewMode === 'viewer3d' || viewMode === 'split') {
+    // Only switch to 3D if already in 3D view
+    if (viewMode === 'viewer3d') {
       setViewMode('viewer3d');
     }
   };

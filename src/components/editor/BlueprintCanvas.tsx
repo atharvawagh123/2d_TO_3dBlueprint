@@ -358,20 +358,16 @@ export const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
           const gType = elem.metadata?.groundType;
           let fill = 'rgba(34, 197, 94, 0.2)';
           let stroke = '#16a34a';
-          let icon = '🌳';
 
           if (gType === 'water') {
             fill = 'rgba(2, 132, 199, 0.25)';
             stroke = '#0284c7';
-            icon = '💧';
           } else if (gType === 'parking') {
             fill = 'rgba(71, 85, 105, 0.22)';
             stroke = '#475569';
-            icon = '🅿️';
           } else if (gType === 'plaza') {
             fill = 'rgba(148, 163, 184, 0.22)';
             stroke = '#64748b';
-            icon = '🏛️';
           }
 
           ctx.fillStyle = fill;

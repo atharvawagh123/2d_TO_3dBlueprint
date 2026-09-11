@@ -84,7 +84,7 @@ function extractCoordRings(geometry: GeoJSONGeometry): [number, number][][] {
 
 export async function importShapefile(file: File): Promise<ShapefileImportResult> {
   const shpjs = await import('shpjs');
-  const parse = (shpjs.default ?? shpjs) as (buf: ArrayBuffer) => Promise<GeoJSONFeatureCollection | GeoJSONFeatureCollection[]>;
+  const parse = (shpjs.default ?? shpjs) as unknown as (buf: ArrayBuffer) => Promise<GeoJSONFeatureCollection | GeoJSONFeatureCollection[]>;
 
   const arrayBuffer = await file.arrayBuffer();
 
