@@ -72,3 +72,15 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Offset ArcGIS 3D and Leaflet zoom controls so they don't collide with top toolbar */
+.esri-ui-top-left {
+  top: 56px !important;
+  left: 16px !important;
+}
+
+.leaflet-top.leaflet-left {
+  top: 56px !important;
+  left: 16px !important;
+}
+

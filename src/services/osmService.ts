@@ -15,6 +15,42 @@ export interface CivilSitePreset {
 
 export const CIVIL_SITE_PRESETS: CivilSitePreset[] = [
   {
+    id: 'east_point_slpk',
+    name: 'East Point 3D Building Digital Twin (ArcGIS SLPK)',
+    region: 'East Point, Atlanta, Georgia, USA',
+    description: 'High-fidelity 3D building models streamed from ArcGIS SceneServer SLPK with full BIM/structural attributes.',
+    bbox: {
+      south: 33.6450,
+      west: -84.4650,
+      north: 33.6850,
+      east: -84.4250,
+    },
+  },
+  {
+    id: 'mont_blanc_alps',
+    name: 'Mont Blanc & Alps (Real 3D Mountain Slopes & Terrain)',
+    region: 'Chamonix-Mont-Blanc, French Alps',
+    description: 'Breathtaking real-world 3D mountain slopes, 4800m summit elevation, alpine valleys, and real Earth terrain relief.',
+    bbox: {
+      south: 45.8150,
+      west: 6.8450,
+      north: 45.8550,
+      east: 6.8950,
+    },
+  },
+  {
+    id: 'wellington_3d',
+    name: 'Wellington Central 3D Digital Twin (WCC SceneServer)',
+    region: 'Wellington City, New Zealand',
+    description: 'Detailed 3D city buildings model from Wellington City Council 3D Data Viewer 2022.',
+    bbox: {
+      south: -41.2950,
+      west: 174.7650,
+      north: -41.2780,
+      east: 174.7880,
+    },
+  },
+  {
     id: 'mumbai_marine',
     name: 'Mumbai Vidhan Bhavan & Marine Drive Coastal Corridor',
     region: 'Nariman Point, Mumbai, India',
